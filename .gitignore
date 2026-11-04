@@ -218,3 +218,44 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/build/
+frontend/coverage/
+frontend/.env.local
+frontend/.env.*.local
+!frontend/src/lib/
+!frontend/src/lib/.gitkeep
+
+# Backend runtime data and credentials
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/logs/*
+!backend/logs/.gitkeep
+
+# Databases and local infrastructure volumes
+*.sqlite3
+*.db
+postgres-data/
+vector-data/
+redis-data/
+
+# Generated 3D and machine-learning artifacts (kept by external providers/model registries)
+*.blend
+*.glb
+*.gltf
+*.fbx
+*.obj
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# OS and editor files
+.DS_Store
+.vscode/
+.idea/
