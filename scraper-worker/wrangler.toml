@@ -1,0 +1,6 @@
+name = "buybyfit-scraper"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Password is a secret, not a var:
+#   npx wrangler secret put API_PASSWORD

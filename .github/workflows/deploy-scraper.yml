@@ -1,0 +1,29 @@
+name: Deploy scraper Worker
+on:
+  push:
+    branches: [main]
+    paths: ["scraper-worker/**", ".github/workflows/deploy-scraper.yml"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scraper-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          workingDirectory: scraper-worker
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            API_PASSWORD
+        env:
+          API_PASSWORD: ${{ secrets.API_PASSWORD }}
