@@ -259,3 +259,6 @@ redis-data/
 .DS_Store
 .vscode/
 .idea/
+
+# ABO import output and download cache
+**/data/abo/
