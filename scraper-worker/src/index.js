@@ -1,4 +1,5 @@
 import { scrapeProduct, searchHomeDepot } from "./scrape.js";
+import { aboProducts, ABO_DEFAULT_TYPES } from "./abo.js";
 
 const MAX_BATCH = 20; // stays under the free-plan subrequest limit with retries
 const DELAY_MS = 400; // spacing between requests in a batch
@@ -9,8 +10,9 @@ const json = (data, status = 200) =>
     headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
   });
 
-const CSV_COLS = ["id", "source", "source_id", "url", "title", "brand", "category", "price", "currency",
-  "width_cm", "depth_cm", "height_cm", "rating", "review_count", "image_urls", "description", "scraped_at"];
+const CSV_COLS = ["id", "source", "source_id", "url", "title", "brand", "product_type", "category", "style",
+  "material", "color", "price", "currency", "width_cm", "depth_cm", "height_cm", "rating", "review_count",
+  "image_urls", "model_3d_url", "description", "license", "scraped_at"];
 
 function toCsv(products) {
   const cell = (v) => {
@@ -42,6 +44,7 @@ const HELP = {
     "GET /search?q=<query>&page=1": "List Home Depot product ids/urls for a search",
     "POST /batch {ids:[], urls:[], format:'json'|'csv'}": `Scrape up to ${MAX_BATCH} products`,
     "GET /collect?q=<query>&limit=10&format=csv": "Search, then scrape the top results in one call",
+    "GET /abo?shard=0&types=SOFA,CHAIR&limit=50&offset=0&dims=1&3d=1&format=csv": "Furniture from Amazon Berkeley Objects (shards 0-9, a-f)",
   },
 };
 
@@ -115,6 +118,23 @@ export default {
         if (!s.ok) return json(s, 502);
         const out = await runBatch(s.results.slice(0, limit).map((r) => ({ url: r.url })));
         return respond(out, url.searchParams.get("format"));
+      }
+
+      if (url.pathname === "/abo") {
+        const q = url.searchParams;
+        const shard = (q.get("shard") || "0").toLowerCase();
+        if (!/^[0-9a-f]$/.test(shard)) return json({ error: "shard must be 0-9 or a-f" }, 400);
+        const products = await aboProducts({
+          shard,
+          types: q.get("types") ? q.get("types").toUpperCase().split(",").map((t) => t.trim()) : ABO_DEFAULT_TYPES,
+          limit: Math.min(Math.max(Number(q.get("limit") || 50), 1), 200),
+          offset: Math.max(Number(q.get("offset") || 0), 0),
+          requireDims: q.get("dims") === "1",
+          require3d: q.get("3d") === "1",
+          images: q.get("images") !== "0",
+          imageSize: q.get("image_size") === "original" ? "original" : "small",
+        });
+        return respond({ products, errors: [] }, q.get("format"));
       }
 
       return json({ error: "not found", ...HELP }, 404);
