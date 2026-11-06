@@ -1,5 +1,6 @@
 import { scrapeProduct, searchHomeDepot } from "./scrape.js";
 import { aboProducts, ABO_DEFAULT_TYPES } from "./abo.js";
+import APP_HTML from "./app.html";
 
 const MAX_BATCH = 20; // stays under the free-plan subrequest limit with retries
 const DELAY_MS = 400; // spacing between requests in a batch
@@ -75,7 +76,10 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "x-api-key, content-type, authorization", "access-control-allow-methods": "GET, POST" } });
     }
-    if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, ...HELP });
+    if (url.pathname === "/" || url.pathname === "/app") {
+      return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+    }
+    if (url.pathname === "/health" || url.pathname === "/api") return json({ ok: true, ...HELP });
     if (!authorized(request, env)) {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401,
