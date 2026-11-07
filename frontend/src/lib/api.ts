@@ -13,13 +13,14 @@ interface ApiDimensions {
   height: number | null;
 }
 
-interface ApiProductCard {
+export interface ApiProductCard {
   id: string;
   name: string;
   brand: string | null;
   category: string | null;
   price: number | null;
   currency: string | null;
+  price_estimate?: { low: number; high: number; basis: string | null } | null;
   image_url: string | null;
   image_urls?: string[];
   product_url: string | null;
@@ -53,7 +54,7 @@ function retailerFromUrl(url: string | null): string {
   }
 }
 
-function toFurnitureProduct(card: ApiProductCard, index: number): FurnitureProduct {
+export function toFurnitureProduct(card: ApiProductCard, index: number): FurnitureProduct {
   return {
     id: card.id,
     name: card.name,
@@ -61,6 +62,7 @@ function toFurnitureProduct(card: ApiProductCard, index: number): FurnitureProdu
     styles: card.style_tags ?? [],
     price: card.price,
     currency: card.currency ?? "USD",
+    priceEstimate: card.price === null && card.price_estimate ? card.price_estimate : undefined,
     brand: card.brand ?? "Unbranded",
     retailer: retailerFromUrl(card.product_url),
     description: card.description?.trim() ?? "",
@@ -69,6 +71,7 @@ function toFurnitureProduct(card: ApiProductCard, index: number): FurnitureProdu
     depthCm: card.dimensions_cm?.depth ?? 0,
     heightCm: card.dimensions_cm?.height ?? 0,
     imageUrl: card.image_url ?? FALLBACK_IMAGE,
+    imageFit: card.image_url ? "contain" : "cover",
     imageAlt: card.name,
     imageUrls: card.image_urls?.filter((url) => Boolean(url.trim())),
     color: card.color?.trim() ?? undefined,

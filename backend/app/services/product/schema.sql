@@ -38,6 +38,13 @@ create table if not exists products (
 -- web/AR-ready copy of model_3d_url (compressed: 1K textures + Draco), set by ar-mvp/prepare_models.py
 alter table products add column if not exists ar_model_url text;
 
+-- Estimated price range for products with no real price (price_estimate.py). Always shown as "Est. $X–$Y";
+-- `price` stays reserved for real retailer prices.
+alter table products add column if not exists est_price_low numeric;
+alter table products add column if not exists est_price_high numeric;
+alter table products add column if not exists est_price_basis text;   -- e.g. "sofa · 224 cm · leather · Rivet"
+alter table products add column if not exists est_price_model text;   -- e.g. "est-v1"
+
 create index if not exists products_type_idx on products (product_type);
 create index if not exists products_dims_idx on products (width_cm, depth_cm, height_cm);
 
@@ -82,23 +89,62 @@ returns table (
     width_cm real, depth_cm real, height_cm real,
     image_url text, model_3d_url text, ar_model_url text, url text, similarity real
 )
-language sql stable
--- keep scanning the HNSW graph until enough rows pass the fit/type filters (pgvector >= 0.8)
-set hnsw.iterative_scan = relaxed_order
+language plpgsql volatile
 as $$
-    select p.id, p.title, p.product_type, p.style, p.color,
-           p.width_cm, p.depth_cm, p.height_cm,
-           p.image_urls[1], p.model_3d_url, p.ar_model_url, p.url,
-           (1 - (e.embedding <=> query_embedding))::real as similarity
-    from product_embeddings e
-    join products p on p.id = e.product_id
-    where e.embedding_model = model
-      and e.embedding_version = version
-      and (max_width_cm  is null or p.width_cm  <= max_width_cm)
-      and (max_depth_cm  is null or p.depth_cm  <= max_depth_cm)
-      and (max_height_cm is null or p.height_cm <= max_height_cm)
-      and (types is null or p.product_type = any(types))
-      and (not require_ar or p.ar_model_url is not null)
-    order by e.embedding <=> query_embedding
-    limit match_count;
+-- Two strategies, because the REST API runs this as `anon`, which has a 3 s statement timeout:
+--  * a product type is given (sofa, plush, ...): exact ranking over just those rows, fetched through
+--    the product_type and primary-key indexes. A selective filter used to send HNSW scanning its whole
+--    graph for enough matches (timeouts with 40 plush toys); a full-table scan of the 45 MB embeddings
+--    table is also slow on a small instance. Index lookups touch only the rows needed.
+--  * no type: HNSW, with a wider search (ef_search 100, default 40 returns < 48 rows) and a bounded
+--    iterative scan so size filters still fill the page without running away.
+begin
+    if types is not null then
+        -- index lookups only (no full scans), and rank after materialising so HNSW can't be used here
+        perform set_config('enable_hashjoin', 'off', true);
+        perform set_config('enable_seqscan', 'off', true);
+        perform set_config('hnsw.iterative_scan', 'off', true);
+        return query
+        with cand as materialized (
+            select p.id, p.title, p.product_type, p.style, p.color, p.width_cm, p.depth_cm, p.height_cm,
+                   p.image_urls[1] as image_url, p.model_3d_url, p.ar_model_url, p.url,
+                   e.embedding <=> query_embedding as dist
+            from products p
+            join product_embeddings e
+              on e.product_id = p.id and e.embedding_model = model and e.embedding_version = version
+            where p.product_type = any(types)
+              and (max_width_cm  is null or p.width_cm  <= max_width_cm)
+              and (max_depth_cm  is null or p.depth_cm  <= max_depth_cm)
+              and (max_height_cm is null or p.height_cm <= max_height_cm)
+              and (not require_ar or p.ar_model_url is not null)
+        )
+        select c.id, c.title, c.product_type, c.style, c.color, c.width_cm, c.depth_cm, c.height_cm,
+               c.image_url, c.model_3d_url, c.ar_model_url, c.url, (1 - c.dist)::real
+        from cand c
+        order by c.dist
+        limit match_count;
+    else
+        perform set_config('enable_hashjoin', 'on', true);
+        perform set_config('enable_seqscan', 'on', true);
+        perform set_config('hnsw.ef_search', greatest(100, match_count * 2)::text, true);
+        perform set_config('hnsw.iterative_scan', 'relaxed_order', true);
+        perform set_config('hnsw.max_scan_tuples', '6000', true);
+        return query
+        select r.* from (
+            select p.id, p.title, p.product_type, p.style, p.color, p.width_cm, p.depth_cm, p.height_cm,
+                   p.image_urls[1], p.model_3d_url, p.ar_model_url, p.url,
+                   (1 - (e.embedding <=> query_embedding))::real as sim
+            from product_embeddings e
+            join products p on p.id = e.product_id
+            where e.embedding_model = model and e.embedding_version = version
+              and (max_width_cm  is null or p.width_cm  <= max_width_cm)
+              and (max_depth_cm  is null or p.depth_cm  <= max_depth_cm)
+              and (max_height_cm is null or p.height_cm <= max_height_cm)
+              and (not require_ar or p.ar_model_url is not null)
+            order by e.embedding <=> query_embedding
+            limit match_count
+        ) r
+        order by r.sim desc;   -- relaxed_order can return near-ties slightly out of order
+    end if;
+end;
 $$;

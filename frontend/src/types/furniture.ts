@@ -31,6 +31,8 @@ export interface FurnitureProduct {
   // the ABO dataset backing it has no retail price for most items.
   price: number | null;
   currency: string | null;
+  // Estimated range when there's no real price (catalogue products). Always displayed as "Est. $X–$Y".
+  priceEstimate?: { low: number; high: number; basis: string | null };
   brand: string;
   retailer: string;
   description: string;
@@ -48,6 +50,9 @@ export interface FurnitureProduct {
   retailerUrl?: string;
   displayOrder: number;
   imagePosition?: string;
+  // Real catalogue photos are product cutouts on white: "contain" shows the whole piece.
+  // The fictional lifestyle photos keep the default "cover".
+  imageFit?: "cover" | "contain";
   // Set only on live search results (ranked by the recommendation service);
   // absent on the static mock catalogue.
   matchScore?: number;

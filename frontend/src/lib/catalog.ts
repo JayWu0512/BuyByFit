@@ -64,8 +64,8 @@ export function filterAndSortFurniture(
       (maxWidth === undefined || product.widthCm <= maxWidth) &&
       (maxDepth === undefined || product.depthCm <= maxDepth) &&
       (maxHeight === undefined || product.heightCm <= maxHeight) &&
-      (minPrice === undefined || (product.price !== null && product.price >= minPrice)) &&
-      (maxPrice === undefined || (product.price !== null && product.price <= maxPrice))
+      (minPrice === undefined || (effectivePrice(product) ?? -1) >= minPrice) &&
+      (maxPrice === undefined || (effectivePrice(product) ?? Infinity) <= maxPrice)
     );
   });
 
@@ -77,12 +77,32 @@ export function filterAndSortFurniture(
   });
 }
 
-/** Null prices (common on live search results) always sort last, regardless of direction. */
+/** Real price if known, otherwise the middle of the estimated range, otherwise null. Used for sorting and filtering. */
+export function effectivePrice(product: Pick<FurnitureProduct, "price" | "priceEstimate">): number | null {
+  if (product.price !== null) return product.price;
+  if (product.priceEstimate) return (product.priceEstimate.low + product.priceEstimate.high) / 2;
+  return null;
+}
+
+/** Products with no price and no estimate always sort last, regardless of direction. */
 export function comparePrice(a: FurnitureProduct, b: FurnitureProduct, direction: "asc" | "desc") {
-  if (a.price === null && b.price === null) return 0;
-  if (a.price === null) return 1;
-  if (b.price === null) return -1;
-  return direction === "asc" ? a.price - b.price : b.price - a.price;
+  const pa = effectivePrice(a);
+  const pb = effectivePrice(b);
+  if (pa === null && pb === null) return 0;
+  if (pa === null) return 1;
+  if (pb === null) return -1;
+  return direction === "asc" ? pa - pb : pb - pa;
+}
+
+/** What to print for a product's price: real price, a labelled estimate, or "Price unavailable". */
+export function priceLabel(product: Pick<FurnitureProduct, "price" | "currency" | "priceEstimate">) {
+  const currency = product.currency ?? "USD";
+  if (product.price !== null) return { text: formatCurrency(product.price, currency), kind: "real" as const };
+  if (product.priceEstimate) {
+    const { low, high } = product.priceEstimate;
+    return { text: `Est. ${formatCurrency(low, currency)}–${formatCurrency(high, currency).replace(/^[^\d]+/, "")}`, kind: "estimate" as const };
+  }
+  return { text: "Price unavailable", kind: "none" as const };
 }
 
 export function formatCurrency(price: number, currency = "USD") {

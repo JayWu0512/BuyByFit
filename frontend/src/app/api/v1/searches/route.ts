@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { furnitureProducts } from "@/lib/mock-furniture";
+import { searchCatalog, supabaseConfigured } from "@/lib/server/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -150,11 +151,15 @@ async function proxyToRecommendationService(targetUrl: string, requestBody: Sear
 }
 
 /**
- * Same-origin browser endpoint for room-brief searches.
+ * Same-origin browser endpoint for room-brief searches. Picks the first backend that's configured:
  *
- * It runs a local Vercel Serverless recommendation for the MVP. Setting the
- * server-only RECOMMENDATION_API_URL switches the same endpoint to a future
- * Python/FastAPI recommendation service without changing client code.
+ * 1. RECOMMENDATION_API_URL: proxy to the Python/FastAPI recommendation service.
+ * 2. SUPABASE_URL + SUPABASE_ANON_KEY: semantic search on the real catalogue in Supabase, over its
+ *    REST API (embeds the brief here, then calls the `match_products` pgvector function).
+ * 3. Neither: the local fictional catalogue, so the MVP always works.
+ *
+ * If Supabase fails, the route falls back to the local catalogue rather than showing an error.
+ * The `x-buybyfit-source` header says which path answered.
  */
 export async function POST(request: Request) {
   let requestBody: SearchRequest;
@@ -167,8 +172,20 @@ export async function POST(request: Request) {
   const targetUrl = backendSearchUrl();
   if (targetUrl) return proxyToRecommendationService(targetUrl, requestBody);
 
+  const description = typeof requestBody.style_description === "string" ? requestBody.style_description.trim() : "";
+  if (!description) return errorResponse("Tell us a little about the room before searching.", 400);
+
+  if (supabaseConfigured()) {
+    try {
+      const result = await searchCatalog(description, requestBody.filters ?? {});
+      return NextResponse.json(result, { status: 201, headers: { "x-buybyfit-source": "supabase" } });
+    } catch (error) {
+      console.error("Supabase search failed, using the local catalogue:", error);
+    }
+  }
+
   const result = localRecommendation(requestBody);
   if (!result) return errorResponse("Tell us a little about the room before searching.", 400);
 
-  return NextResponse.json(result, { status: 201 });
+  return NextResponse.json(result, { status: 201, headers: { "x-buybyfit-source": "local-demo" } });
 }

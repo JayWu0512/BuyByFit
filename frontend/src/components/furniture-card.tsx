@@ -1,14 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { formatCurrency, formatDimensions, formatLabel, toClassToken } from "@/lib/catalog";
+import { formatDimensions, formatLabel, priceLabel, toClassToken } from "@/lib/catalog";
 import { FurnitureProduct } from "@/types/furniture";
 
 interface FurnitureCardProps {
   product: FurnitureProduct;
   priority?: boolean;
   headingLevel?: 2 | 3;
-  /** "retailer" for live search results, which have no internal /products/[id] page. */
+  /** "detail" opens /products/[id] (demo and Supabase catalogue products); "retailer" links out directly. */
   linkTo?: "detail" | "retailer";
 }
 
@@ -18,15 +18,16 @@ export function FurnitureCard({ product, priority = false, headingLevel = 3, lin
   const href = useRetailerLink ? product.retailerUrl : `/products/${product.id}`;
 
   const stage = (
-    <div className={`product-image-stage stage-${toClassToken(product.category)}`}>
+    <div className={`product-image-stage stage-${toClassToken(product.category)}${product.imageFit === "contain" ? " stage-cutout" : ""}`}>
       <Image
         src={product.imageUrl}
         alt={product.imageAlt}
         fill
         priority={priority}
         sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, (max-width: 1280px) 33vw, 25vw"
-        style={{ objectFit: "cover", objectPosition: product.imagePosition ?? "center" }}
+        style={{ objectFit: product.imageFit ?? "cover", objectPosition: product.imagePosition ?? "center" }}
       />
+      {product.arModelUrl || product.model3dUrl ? <span className="product-3d-badge">3D</span> : null}
     </div>
   );
 
@@ -63,11 +64,20 @@ export function FurnitureCard({ product, priority = false, headingLevel = 3, lin
               )}
             </ProductHeading>
           </div>
-          {product.price !== null ? (
-            <p className="product-price">{formatCurrency(product.price, product.currency ?? "USD")}</p>
-          ) : (
-            <p className="product-price product-price-unavailable">Price unavailable</p>
-          )}
+          {(() => {
+            const label = priceLabel(product);
+            if (label.kind === "real") return <p className="product-price">{label.text}</p>;
+            if (label.kind === "estimate")
+              return (
+                <p
+                  className="product-price product-price-estimate"
+                  title={`Estimated from ${product.priceEstimate?.basis ?? "size, material and brand"}. Check the retailer for the live price.`}
+                >
+                  {label.text}
+                </p>
+              );
+            return <p className="product-price product-price-unavailable">{label.text}</p>;
+          })()}
         </div>
         <p className="product-brand">{product.brand}</p>
         {product.description ? <p className="product-card-description">{product.description}</p> : null}

@@ -392,7 +392,7 @@ export function DiscoverView() {
                 <FurnitureCard
                   headingLevel={2}
                   key={product.id}
-                  linkTo={product.retailerUrl ? "retailer" : "detail"}
+                  linkTo="detail"
                   priority={index < 4}
                   product={product}
                 />
