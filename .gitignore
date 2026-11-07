@@ -246,6 +246,7 @@ backend/logs/*
 postgres-data/
 vector-data/
 redis-data/
+*.csv
 
 # Generated 3D and machine-learning artifacts (kept by external providers/model registries)
 *.blend
