@@ -4,11 +4,11 @@ BuyByFit helps people discover furniture for the room they actually have. The cu
 
 ## Current status
 
-- `frontend/` is a working Next.js 15 application with local mock data and fictional product photography.
-- A free-form room brief is the primary discovery flow; all non-empty briefs intentionally return the same 16 mock products until AI search is connected.
+- `frontend/` is a working Next.js 15 application with an always-available local demo catalogue and a same-origin Vercel Serverless search endpoint.
+- A free-form room brief is the primary discovery flow. With `RECOMMENDATION_API_URL` configured, that endpoint forwards to the FastAPI semantic search service, which retrieves from the imported pgvector catalogue.
 - Search copy and sort state persist within the browser tab when a visitor opens a product and returns to results.
-- Product details deliberately disable purchasing because retailer URLs are not yet verified.
-- `backend/` documents the planned API and provides a separate temporary mock server, but the frontend does not currently call it.
+- Source product cards preserve images, descriptions, materials, dimensions, retailer URLs, and optional 3D/AR fields from the local CSV export; local demo products remain explicitly fictional.
+- `backend/` contains the catalogue importer and FastAPI recommendation route, plus a separate temporary mock server for contract work.
 
 ## Quick start
 
@@ -30,7 +30,7 @@ For routes, project layout, browser support, mock-data boundaries, and integrati
 
 ## Vercel deployment
 
-Vercel should import [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit), not this collaboration repository. The GitHub Actions workflow at [`.github/workflows/sync-vercel-deploy-repo.yml`](.github/workflows/sync-vercel-deploy-repo.yml) mirrors this repository's `frontend/` directory to that deployment repository whenever `main` changes. This keeps the team workflow simple: contributors merge only into this repository, and Vercel deploys the mirrored result.
+Vercel should import [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit), not this collaboration repository. The GitHub Actions workflow at [`.github/workflows/sync-vercel-deploy-repo.yml`](.github/workflows/sync-vercel-deploy-repo.yml) mirrors this repository's `frontend/` directory to that deployment repository whenever `main` changes. This keeps the team workflow simple: contributors merge only into this repository, and Vercel deploys the mirrored result. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the frontend type-check/build and backend recommendation tests first on every pull request and main-branch update.
 
 One repository secret is required in **JayWu0512/BuyByFit**:
 
@@ -39,9 +39,11 @@ One repository secret is required in **JayWu0512/BuyByFit**:
 3. Ensure `buy-by-fit` is a dedicated deployment mirror. Its `main` branch will be replaced by the contents of `frontend/` on each successful source-repository merge.
 4. Import `buy-by-fit` into Vercel with **Root Directory** set to `./`, **Install Command** `npm ci`, and **Build Command** `npm run build`. Vercel detects Next.js automatically.
 
-`frontend/package.json` declares Node.js `>=20.9.0`, and `package-lock.json` is committed, so Vercel uses a reproducible dependency graph. No `vercel.json` is needed for this standard Next.js deployment.
+Without that secret, the mirror workflow finishes successfully with a visible **skipped** notice rather than failing CI. Configure the secret before expecting Vercel to receive new commits.
 
-The deployed frontend's search endpoint is same-origin (`/api/v1/searches`) and works as a Vercel Serverless Function against the fictional MVP catalogue by default. For the future FastAPI recommendation service, configure server-only `RECOMMENDATION_API_URL` with its deployed origin; the route then proxies requests without changing frontend code. `localhost` only works on a developer machine and must never be used as the Production value.
+`frontend/package.json` declares Node.js `>=20.9.0`, and `package-lock.json` is committed, so Vercel uses a reproducible dependency graph. Select the **Next.js** framework preset in Vercel, leave Output Directory blank, and use Node.js 22 LTS. No `vercel.json` is needed for this standard Next.js deployment.
+
+The deployed frontend's search endpoint is same-origin (`/api/v1/searches`) and works as a Vercel Serverless Function against the fictional MVP catalogue by default. For semantic results from the imported product catalogue, deploy the FastAPI service and configure server-only `RECOMMENDATION_API_URL` with its deployed origin; the route then proxies requests without changing frontend code. `localhost` only works on a developer machine and must never be used as the Production value.
 
 ## Repository layout
 
