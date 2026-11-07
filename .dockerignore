@@ -1,0 +1,16 @@
+# Only backend/ goes into the image (see Dockerfile); keep the build context small.
+frontend/
+scraper-worker/
+infra/
+docs/
+.github/
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+backend/storage/
+backend/logs/
+backend/.env
+backend/.env.*
+.env
+.env.*
+.git/
