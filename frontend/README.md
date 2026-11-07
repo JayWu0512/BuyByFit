@@ -1,23 +1,55 @@
-# Frontend
+# BuyByFit frontend
 
-Placeholder for the web client.
+BuyByFit is a furniture-discovery MVP for people furnishing a real room. Rather than beginning with filters, visitors describe the room in their own words and then review a calm, Scandinavian-inspired catalogue of pieces that fit the brief.
 
-## Current API for development
+The current app is a self-contained Next.js demo. It deliberately uses local mock data and fictional imagery; no backend, retailer, or AI recommendation service is called yet.
 
-Before the production backend exists, Jay can start the mock API with:
+## Run locally
+
+Requirements: Node.js 20.9 or later and npm.
 
 ```bash
-cd backend
-python -m app.api.mock_server
+cd frontend
+npm install
+npm run dev
 ```
 
-Use `POST /api/v1/searches` for the first-page preference form and `GET /api/v1/searches/{search_id}/products` for the second-page product grid. Request and response examples are in [the mock API guide](../backend/app/api/MOCK_API.md); do not add fields to the UI contract without first updating [the API contract](../backend/app/api/API_CONTRACT.md).
+Open [http://localhost:3000](http://localhost:3000). Useful checks:
 
-Suggested feature ownership:
+```bash
+npm run typecheck
+npm run build
+```
 
-- `features/catalog`: product browsing and filters
-- `features/recommendations`: ranked product results
-- `features/room-upload`: image/measurement submission
-- `features/room-preview`: 3D room visualization
+## Routes and behavior
 
-Choose the UI framework before adding package manifests and build configuration.
+| Route | Purpose |
+| --- | --- |
+| `/` | Brand introduction and product principles. |
+| `/discover` | Free-form room brief. A non-empty submission reveals the mock catalogue; voice dictation is offered when the browser supports the Web Speech API. |
+| `/products/[id]` | Product detail, dimensions, materials, style, and a disabled `Buy it` action for the fictional catalogue. |
+
+Search text and sorting are kept in tab-scoped session storage, so **Back to your search** returns to the same result state. Every valid brief currently returns the same 16 fictional products by design.
+
+## Project map
+
+```text
+src/app/                   Route pages, shared layout, and global styles
+src/components/            Header, footer, logo, discovery view, and product cards
+src/lib/mock-furniture.ts  Local fictional catalogue
+src/lib/catalog.ts         Product lookup and catalogue helpers
+src/types/                 Shared TypeScript types
+public/images/             Fictional demonstration photography
+public/brand-mark.svg      BuyByFit browser icon and reusable mark
+```
+
+## Design and content rules
+
+- The visual system is documented in [DESIGN.md](DESIGN.md); it uses warm paper, oat, sage, timber, and soft asymmetric image corners.
+- The product intent and MVP boundaries are documented in [PRODUCT.md](PRODUCT.md).
+- All catalogue images, retailer references, descriptions, and prices are fictional. Replace them with licensed assets, verified product data, and real retailer URLs before release.
+- `Buy it` remains unavailable until a verified product URL is supplied.
+
+## Backend integration
+
+The backend mock server and future API contract live in [`../backend/app/api/`](../backend/app/api/). The present frontend does **not** call those endpoints. When real search is ready, replace the local submit path in `src/components/discover-view.tsx` with the agreed API client and update the frontend handling, API contract, and mock guide together.
