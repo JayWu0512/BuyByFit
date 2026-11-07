@@ -389,7 +389,13 @@ export function DiscoverView() {
           {results.length > 0 ? (
             <div className="furniture-grid">
               {results.map((product, index) => (
-                <FurnitureCard headingLevel={2} key={product.id} linkTo="retailer" priority={index < 4} product={product} />
+                <FurnitureCard
+                  headingLevel={2}
+                  key={product.id}
+                  linkTo={product.retailerUrl ? "retailer" : "detail"}
+                  priority={index < 4}
+                  product={product}
+                />
               ))}
             </div>
           ) : (
