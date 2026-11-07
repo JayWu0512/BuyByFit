@@ -31,3 +31,21 @@ Exact request/response examples are in [MOCK_API.md](MOCK_API.md). The mock is t
 | Product catalog fields and detail response | A — Diwas | B, D |
 | Search filters, ranking response, and explanation | B — Tem | A, C, D |
 | Room media input, 3D job status, preview/scene URL response | C — Isaac | B, D |
+
+## Room visualization (C — Isaac) — proposed, needs B + D sign-off
+
+"See these pieces in your room" on Discover: the user's room photo + the brief + the search results already on
+screen -> the room restyled with some of those products, placed at their real size. Implemented in
+`app/api/v1/rooms.py` + `app/services/three_d/`; the frontend calls same-origin Next.js routes with the same paths,
+which forward to this service (`ROOM_API_URL`, else `RECOMMENDATION_API_URL`).
+
+| Endpoint | Request | Response |
+| --- | --- | --- |
+| `POST /api/v1/rooms` | multipart: `photo` (JPEG/PNG, <= 15 MB), optional `pitch_deg` (phone tilt, -60..89, from the in-page camera) | `201 {room_id, scene, photo_url}` |
+| `POST /api/v1/rooms/{room_id}/visualizations` | `{brief, products: [{id, name, category, width_cm, depth_cm, height_cm, image_url, product_url}]}` (1–30 search results) | `202 {job_id}` |
+| `GET /api/v1/visualizations/{job_id}` | — | `{status: queued\|running\|done\|error, stage: design\|place\|render\|verify\|done, elapsed_s, info: {guide_url?}, result?, error?}` |
+| `GET /api/v1/rooms/{room_id}/files/{name}` | — | the room photo, placement guide or render (image) |
+
+`result`: `{vibe, photo_url, render_url, items: [{role, product: {id, name, category, image_url, product_url, size_cm}, placed_at_true_size, alternatives: [...]}], styling: [str], timings_s}`.
+A run takes ~30–60 s (Gemini on Vertex: design, true-size placement, image render, size check, one retry), so it
+is a background job polled every ~2.5 s. Errors use the usual `{"error": {"message", "status"}}` shape.

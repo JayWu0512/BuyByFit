@@ -16,6 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.v1.rooms import router as rooms_router
 from app.api.v1.searches import router as searches_router
 
 
@@ -52,6 +53,7 @@ def create_application() -> FastAPI:
         return {"status": "ok", "mode": "live"}
 
     app.include_router(searches_router)
+    app.include_router(rooms_router)
     return app
 
 

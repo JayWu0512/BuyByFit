@@ -1475,3 +1475,485 @@ h2 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Room visualization: "See these pieces in your room" (src/components/room-visualizer.tsx) ---------- */
+
+.room-visualizer {
+  margin: 1.5rem 0 2.5rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  border-radius: var(--image-radius-small) var(--image-radius-large) var(--image-radius-small) var(--image-radius-small);
+  background: var(--oat);
+}
+
+.room-visualizer-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.room-visualizer-head p {
+  max-width: 62ch;
+  margin: 0.6rem 0 0;
+  color: var(--soft-ink);
+}
+
+.room-visualizer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.room-visualizer-actions .button:not(.button-dark) {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.room-visualizer-hint,
+.room-visualizer-note,
+.room-visualizer-meta {
+  margin: 0;
+  color: var(--soft-ink);
+  font-size: 0.88rem;
+}
+
+.room-visualizer-actions .room-visualizer-hint {
+  flex-basis: 100%;
+}
+
+.room-visualizer-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #8a2d1d;
+  font-weight: 700;
+}
+
+.room-visualizer-camera {
+  max-width: 480px;
+  margin-top: 1.25rem;
+}
+
+.room-visualizer-camera video {
+  display: block;
+  width: 100%;
+  border-radius: var(--image-radius-small);
+  background: var(--ink);
+}
+
+.room-visualizer-tilt {
+  margin: 0.6rem 0 0;
+  font-weight: 700;
+}
+
+.room-visualizer-progress {
+  margin-top: 1.25rem;
+}
+
+.room-visualizer-progress ol {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.room-visualizer-progress li {
+  color: var(--soft-ink);
+}
+
+.room-visualizer-progress li::before {
+  display: inline-block;
+  width: 1.4rem;
+  content: "·";
+}
+
+.room-visualizer-progress li.is-done {
+  color: var(--timber-dark);
+}
+
+.room-visualizer-progress li.is-done::before {
+  content: "✓";
+}
+
+.room-visualizer-progress li.is-now {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.room-visualizer-progress li.is-now::before {
+  content: "→";
+}
+
+.room-visualizer-guide {
+  max-width: 420px;
+  margin: 1rem 0 0;
+}
+
+.room-visualizer-guide img {
+  display: block;
+  width: 100%;
+  border-radius: var(--image-radius-small);
+  opacity: 0.85;
+}
+
+.room-visualizer-guide figcaption {
+  margin-top: 0.4rem;
+  color: var(--soft-ink);
+  font-size: 0.88rem;
+}
+
+.room-visualizer-note {
+  margin: 1rem 0 0.75rem;
+}
+
+
+/* Result: big image with before / compare / after, numbered markers, product cards. */
+
+.rv-result {
+  margin-top: 1rem;
+}
+
+.rv-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+}
+
+.rv-kicker {
+  margin: 0;
+  color: var(--timber-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rv-result-head h3 {
+  max-width: 34ch;
+  margin: 0.3rem 0 0;
+  font-family: var(--display);
+  font-size: clamp(1.3rem, 2.2vw, 1.9rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.rv-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+}
+
+.rv-light {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.rv-light:disabled {
+  opacity: 0.5;
+}
+
+.rv-view-switch {
+  display: inline-flex;
+  margin: 1.25rem 0 0.75rem;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--paper-deep);
+}
+
+.rv-view-switch button {
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--soft-ink);
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.rv-view-switch button.is-on {
+  color: var(--surface);
+  background: var(--ink);
+}
+
+.rv-stage {
+  position: relative;
+  max-width: 760px;
+  overflow: hidden;
+  border-radius: var(--image-radius-small) var(--image-radius-large) var(--image-radius-small) var(--image-radius-small);
+  background: var(--ink);
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.rv-stage.is-compare {
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.rv-stage img {
+  display: block;
+  width: 100%;
+}
+
+.rv-stage .rv-after {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rv-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--surface);
+  pointer-events: none;
+}
+
+.rv-divider span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 25%);
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+}
+
+.rv-marker {
+  position: absolute;
+  display: grid;
+  width: 1.3rem;
+  height: 1.3rem;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid rgb(255 255 255 / 85%);
+  border-radius: 50%;
+  color: var(--surface);
+  background: rgb(41 43 40 / 45%);
+  backdrop-filter: blur(3px);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  /* Sits just above the top edge of its piece, never on it. */
+  transform: translate(-50%, -125%);
+  transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease;
+  opacity: 0.85;
+}
+
+.rv-marker:hover,
+.rv-marker.is-active {
+  background: var(--timber-dark);
+  opacity: 1;
+  transform: translate(-50%, -125%) scale(1.25);
+}
+
+.rv-markers-toggle {
+  margin-left: 0.75rem;
+  padding: 0;
+  border: 0;
+  color: var(--soft-ink);
+  background: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rv-section-title {
+  margin: 1.75rem 0 0.75rem;
+  font-family: var(--display);
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.rv-pieces {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-pieces > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+  padding: 0.9rem;
+  border: 2px solid transparent;
+  border-radius: var(--image-radius-small);
+  background: var(--surface);
+  transition: border-color 160ms ease;
+}
+
+.rv-pieces > li.is-active {
+  border-color: var(--timber);
+}
+
+.rv-number {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  z-index: 1;
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.rv-pieces > li > img,
+.rv-thumb {
+  width: 84px;
+  height: 84px;
+  border-radius: var(--image-radius-small);
+  object-fit: contain;
+  background: var(--paper);
+}
+
+.rv-piece-body {
+  min-width: 0;
+}
+
+.rv-piece-name {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 0.15rem;
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rv-piece-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+}
+
+.rv-size,
+.rv-fit {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--paper-deep);
+  color: var(--soft-ink);
+}
+
+.rv-fit.is-real {
+  color: #2f4a2b;
+  background: var(--sage-pale);
+}
+
+.rv-piece-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.55rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.rv-piece-links a {
+  color: var(--timber-dark);
+}
+
+.rv-alts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  color: var(--soft-ink);
+  font-size: 0.78rem;
+}
+
+.rv-alts span {
+  margin-right: 0.2rem;
+}
+
+.rv-alts a {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.6rem;
+}
+
+.rv-alts img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.rv-styling p {
+  margin: -0.4rem 0 0.6rem;
+  color: var(--soft-ink);
+  font-size: 0.88rem;
+}
+
+.rv-styling ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-styling li {
+  max-width: 40ch;
+  padding: 0.45rem 0.8rem;
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--soft-ink);
+  font-size: 0.86rem;
+}
+
+@media (max-width: 760px) {
+  .rv-result-actions {
+    width: 100%;
+  }
+
+  .rv-result-actions .button {
+    flex: 1;
+  }
+}
+
+.room-visualizer-role {
+  margin: 0;
+  color: var(--timber-dark);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
