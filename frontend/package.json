@@ -26,5 +26,10 @@
     "postcss": "^8.5.32",
     "tailwindcss": "3.4.17",
     "typescript": "5.8.3"
+  },
+  "allowScripts": {
+    "onnxruntime-node@1.30.0": true,
+    "protobufjs@7.6.6": true,
+    "fsevents@2.3.3": true
   }
 }
