@@ -1,3 +1,6 @@
+// Suggested defaults for curated UI (e.g. starter filter chips). Not an
+// exhaustive list -- the real catalog's category/style values are open-ended,
+// so FurnitureProduct below accepts any string rather than enforcing these.
 export const categories = [
   "Sofa",
   "Chair",
@@ -22,10 +25,12 @@ export type FurnitureStyle = (typeof styles)[number];
 export interface FurnitureProduct {
   id: string;
   name: string;
-  category: FurnitureCategory;
-  styles: FurnitureStyle[];
-  price: number;
-  currency: "USD";
+  category: string;
+  styles: string[];
+  // Nullable because live search results (real catalog) often lack pricing --
+  // the ABO dataset backing it has no retail price for most items.
+  price: number | null;
+  currency: string | null;
   brand: string;
   retailer: string;
   description: string;
@@ -38,14 +43,17 @@ export interface FurnitureProduct {
   retailerUrl?: string;
   displayOrder: number;
   imagePosition?: string;
+  // Set only on live search results (ranked by the recommendation service);
+  // absent on the static mock catalogue.
+  matchScore?: number;
 }
 
 export type CatalogSort = "recommended" | "price-asc" | "price-desc" | "name-asc";
 
 export interface CatalogFilters {
   query: string;
-  selectedStyles: FurnitureStyle[];
-  category: FurnitureCategory | "";
+  selectedStyles: string[];
+  category: string;
   maxWidth: string;
   maxDepth: string;
   maxHeight: string;

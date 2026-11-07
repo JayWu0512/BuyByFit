@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { FurnitureCard } from "@/components/furniture-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { formatCurrency, formatDimensions, getFurnitureById, getRelatedFurniture } from "@/lib/catalog";
+import { formatCurrency, formatDimensions, formatLabel, getFurnitureById, getRelatedFurniture, toClassToken } from "@/lib/catalog";
 import { furnitureProducts } from "@/lib/mock-furniture";
 
 interface ProductPageProps {
@@ -31,7 +31,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       </div>
       <div className="page-shell product-shell">
         <section className="product-detail" aria-labelledby="product-title">
-          <div className={`product-detail-media stage-${product.category.toLowerCase()}`}>
+          <div className={`product-detail-media stage-${toClassToken(product.category)}`}>
             <Image
               alt={product.imageAlt}
               fill
@@ -43,14 +43,16 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
           <div className="product-detail-copy">
             <h1 id="product-title">{product.name}</h1>
-            <p className="product-detail-price">{formatCurrency(product.price, product.currency)}</p>
-            <p className="product-detail-brand">{product.category} · {product.brand} · {product.retailer}</p>
+            <p className="product-detail-price">
+              {product.price !== null ? formatCurrency(product.price, product.currency ?? "USD") : "Price unavailable"}
+            </p>
+            <p className="product-detail-brand">{formatLabel(product.category)} · {product.brand} · {product.retailer}</p>
             <p className="product-description">{product.description}</p>
 
             <dl className="product-specs">
               <div>
                 <dt>Style</dt>
-                <dd>{product.styles.join(" · ")}</dd>
+                <dd>{product.styles.map(formatLabel).join(" · ")}</dd>
               </div>
               <div>
                 <dt>Material</dt>

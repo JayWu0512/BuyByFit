@@ -64,20 +64,28 @@ export function filterAndSortFurniture(
       (maxWidth === undefined || product.widthCm <= maxWidth) &&
       (maxDepth === undefined || product.depthCm <= maxDepth) &&
       (maxHeight === undefined || product.heightCm <= maxHeight) &&
-      (minPrice === undefined || product.price >= minPrice) &&
-      (maxPrice === undefined || product.price <= maxPrice)
+      (minPrice === undefined || (product.price !== null && product.price >= minPrice)) &&
+      (maxPrice === undefined || (product.price !== null && product.price <= maxPrice))
     );
   });
 
   return [...filtered].sort((a, b) => {
-    if (filters.sort === "price-asc") return a.price - b.price;
-    if (filters.sort === "price-desc") return b.price - a.price;
+    if (filters.sort === "price-asc") return comparePrice(a, b, "asc");
+    if (filters.sort === "price-desc") return comparePrice(a, b, "desc");
     if (filters.sort === "name-asc") return a.name.localeCompare(b.name);
     return a.displayOrder - b.displayOrder;
   });
 }
 
-export function formatCurrency(price: number, currency: FurnitureProduct["currency"] = "USD") {
+/** Null prices (common on live search results) always sort last, regardless of direction. */
+export function comparePrice(a: FurnitureProduct, b: FurnitureProduct, direction: "asc" | "desc") {
+  if (a.price === null && b.price === null) return 0;
+  if (a.price === null) return 1;
+  if (b.price === null) return -1;
+  return direction === "asc" ? a.price - b.price : b.price - a.price;
+}
+
+export function formatCurrency(price: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -87,4 +95,18 @@ export function formatCurrency(price: number, currency: FurnitureProduct["curren
 
 export function formatDimensions(product: Pick<FurnitureProduct, "widthCm" | "depthCm" | "heightCm">) {
   return `${product.widthCm}W × ${product.depthCm}D × ${product.heightCm}H cm`;
+}
+
+/** Turns a raw catalog value (e.g. "home_furniture_and_decor") into a display label. No-op on already-formatted strings like "Sofa". */
+export function formatLabel(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+/** Sanitizes a raw catalog value into a safe single CSS class token. */
+export function toClassToken(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
 }

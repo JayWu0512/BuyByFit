@@ -4,7 +4,8 @@ import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { FurnitureCard } from "@/components/furniture-card";
-import { furnitureProducts } from "@/lib/mock-furniture";
+import { searchFurniture } from "@/lib/api";
+import { comparePrice } from "@/lib/catalog";
 import { CatalogSort, FurnitureProduct } from "@/types/furniture";
 
 interface SpeechRecognitionAlternativeLike {
@@ -50,9 +51,9 @@ const sortOptions: Array<{ value: CatalogSort; label: string }> = [
 
 const searchSessionKey = "buybyfit-room-brief";
 
-function saveSearchState(brief: string, sort: CatalogSort) {
+function saveSearchState(brief: string, sort: CatalogSort, results: FurnitureProduct[]) {
   try {
-    sessionStorage.setItem(searchSessionKey, JSON.stringify({ brief, sort }));
+    sessionStorage.setItem(searchSessionKey, JSON.stringify({ brief, sort, results }));
   } catch {
     // The search still works when a browser denies session storage.
   }
@@ -68,8 +69,8 @@ function clearSearchState() {
 
 function sortFurniture(products: FurnitureProduct[], sort: CatalogSort) {
   return [...products].sort((a, b) => {
-    if (sort === "price-asc") return a.price - b.price;
-    if (sort === "price-desc") return b.price - a.price;
+    if (sort === "price-asc") return comparePrice(a, b, "asc");
+    if (sort === "price-desc") return comparePrice(a, b, "desc");
     if (sort === "name-asc") return a.name.localeCompare(b.name);
     return a.displayOrder - b.displayOrder;
   });
@@ -83,10 +84,12 @@ export function DiscoverView() {
   const [isListening, setIsListening] = useState(false);
   const [voiceMessage, setVoiceMessage] = useState("");
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<FurnitureProduct[]>([]);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const results = useMemo(() => sortFurniture(furnitureProducts, sort), [sort]);
+  const results = useMemo(() => sortFurniture(searchResults, sort), [searchResults, sort]);
 
   useEffect(() => {
     const recognitionWindow = window as typeof window & {
@@ -103,11 +106,14 @@ export function DiscoverView() {
       const savedSearch = sessionStorage.getItem(searchSessionKey);
       if (!savedSearch) return;
 
-      const savedState = JSON.parse(savedSearch) as { brief?: unknown; sort?: unknown };
+      const savedState = JSON.parse(savedSearch) as { brief?: unknown; sort?: unknown; results?: unknown };
       if (typeof savedState.brief !== "string" || savedState.brief.trim() === "") return;
 
       setBrief(savedState.brief);
       setSubmittedBrief(savedState.brief);
+      if (Array.isArray(savedState.results)) {
+        setSearchResults(savedState.results as FurnitureProduct[]);
+      }
       if (typeof savedState.sort === "string" && sortOptions.some((option) => option.value === savedState.sort)) {
         setSort(savedState.sort as CatalogSort);
       }
@@ -123,7 +129,7 @@ export function DiscoverView() {
     resultsRef.current?.focus({ preventScroll: true });
   }, [submittedBrief]);
 
-  const submitBrief = (event: FormEvent<HTMLFormElement>) => {
+  const submitBrief = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedBrief = brief.trim();
 
@@ -134,20 +140,30 @@ export function DiscoverView() {
     }
 
     setError("");
-    saveSearchState(trimmedBrief, sort);
-    setSubmittedBrief(trimmedBrief);
+    setIsSearching(true);
+    try {
+      const products = await searchFurniture(trimmedBrief);
+      setSearchResults(products);
+      saveSearchState(trimmedBrief, sort, products);
+      setSubmittedBrief(trimmedBrief);
+    } catch {
+      setError("We couldn't reach the recommendation service. Check that the backend is running and try again.");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const startOver = () => {
     clearSearchState();
     setSubmittedBrief(null);
+    setSearchResults([]);
     window.setTimeout(() => promptRef.current?.focus(), 0);
   };
 
   const updateSort = (nextSort: CatalogSort) => {
     setSort(nextSort);
     if (submittedBrief) {
-      saveSearchState(submittedBrief, nextSort);
+      saveSearchState(submittedBrief, nextSort, searchResults);
     }
   };
 
@@ -272,10 +288,10 @@ export function DiscoverView() {
               ) : null}
 
               <div className="prompt-actions">
-                <button className="button button-dark" type="submit">
-                  Find pieces
+                <button className="button button-dark" disabled={isSearching} type="submit">
+                  {isSearching ? "Searching…" : "Find pieces"}
                 </button>
-                <p>Demo mode: every brief currently returns the same fictional catalogue.</p>
+                <p>Results are ranked live by our recommendation service against a real (small, work-in-progress) product catalog.</p>
               </div>
             </form>
 
@@ -346,7 +362,7 @@ export function DiscoverView() {
             <div className="search-results-copy">
               <h1 id="results-heading">Furniture for your room</h1>
               <p className="submitted-brief">“{submittedBrief}”</p>
-              <p className="mock-results-note">This prototype shows the same 16 fictional pieces for every search. The AI recommendation layer comes next.</p>
+              <p className="mock-results-note">Ranked live against our real product catalog -- still early, so results and coverage are limited.</p>
             </div>
 
             <div className="results-actions">
@@ -367,14 +383,20 @@ export function DiscoverView() {
           </div>
 
           <p className="result-count" aria-live="polite">
-            {results.length} fictional pieces to explore
+            {results.length > 0 ? `${results.length} pieces found` : "No matches yet"}
           </p>
 
-          <div className="furniture-grid">
-            {results.map((product, index) => (
-              <FurnitureCard headingLevel={2} key={product.id} product={product} priority={index < 4} />
-            ))}
-          </div>
+          {results.length > 0 ? (
+            <div className="furniture-grid">
+              {results.map((product, index) => (
+                <FurnitureCard headingLevel={2} key={product.id} linkTo="retailer" priority={index < 4} product={product} />
+              ))}
+            </div>
+          ) : (
+            <p className="no-results-note">
+              We couldn&apos;t find a close match for that brief yet -- try describing the room differently, or check back as the catalog grows.
+            </p>
+          )}
         </section>
       )}
     </section>
