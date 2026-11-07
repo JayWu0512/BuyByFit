@@ -71,6 +71,16 @@ def test_import(tmp_path):
     assert rows[0]["width_cm"] == "221.0"
 
 
+def test_dim_cm_rejects_zero_and_unit_errors():
+    def d(v, unit="centimeters"):
+        return {"unit": unit, "value": v}
+    assert abo_import.dim_cm(d(81)) == 81.0
+    assert abo_import.dim_cm(d(87, "inches")) == 221.0
+    assert abo_import.dim_cm(d(0)) is None       # ABO uses 0 for "not filled in"
+    assert abo_import.dim_cm(d(845)) is None     # Solimo sofas: >6 m is a unit error
+    assert abo_import.dim_cm(d(5, "parsecs")) is None
+
+
 def test_filters(tmp_path):
     cache, out = tmp_path / "cache", tmp_path / "out"
     make_cache(cache)

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BuyByFit Room Designer</title>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  :root { --bg: #f6f4f0; --surface: #fff; --text: #1d1b18; --muted: #6d675f; --line: #e4dfd7; --accent: #b5562b;
+          --accent-ink: #fff; --chip: #efe9e1; --err: #b3261e; --scene: #ece8e1; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151412; --surface: #1f1d1a; --text: #f1ede7; --muted: #a59e94; --line: #34312c; --accent: #e07a4a;
+            --accent-ink: #1a0f09; --chip: #2a2723; --err: #f2b8b5; --scene: #1b1a18; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .app { display: grid; grid-template-columns: 380px minmax(0, 1fr); height: 100%; }
+  aside { overflow-y: auto; border-right: 1px solid var(--line); background: var(--surface); padding: 18px 16px 40px; }
+  #view { position: relative; background: var(--scene); min-height: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 52vh auto; height: auto; }
+    #view { order: -1; height: 52vh; }
+    aside { border-right: 0; border-top: 1px solid var(--line); }
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 2px; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: .9rem; }
+  .step { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+  .step h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=text], input[type=number], select { font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; min-width: 0; }
+  input[type=text] { flex: 1; }
+  input[type=number] { width: 7.5em; }
+  button { font: 600 .9rem system-ui, sans-serif; border-radius: 10px; padding: 9px 13px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  .file { display: block; border: 1.5px dashed var(--line); border-radius: 12px; padding: 14px; text-align: center;
+    cursor: pointer; color: var(--muted); font-size: .9rem; }
+  .file input { display: none; }
+  .hint { color: var(--muted); font-size: .82rem; margin: 8px 0 0; }
+  .msg { font-size: .88rem; margin: 8px 0 0; min-height: 1.2em; }
+  .msg.err { color: var(--err); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 3px 9px; font-size: .78rem; cursor: pointer; border: 0;
+    font-weight: 500; color: var(--text); }
+  .item { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .item:first-child { border-top: 0; }
+  .item img, .item .ph { width: 56px; height: 56px; object-fit: contain; background: #fff; border-radius: 8px; }
+  .item .ph { display: grid; place-items: center; background: var(--chip); font-size: 1.3rem; }
+  .item .t { font-weight: 600; font-size: .86rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item .r { color: var(--muted); font-size: .8rem; }
+  .item .slot { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); font-weight: 700; }
+  .item .sw { display: flex; gap: 6px; margin-top: 5px; align-items: center; font-size: .78rem; color: var(--muted); }
+  .item .sw button { padding: 3px 9px; font-size: .78rem; }
+  .item.active { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 10px; }
+  .skipped { color: var(--muted); font-size: .8rem; margin-top: 8px; }
+  .toggle { position: absolute; top: 12px; left: 12px; display: flex; background: var(--surface); border-radius: 999px;
+    border: 1px solid var(--line); overflow: hidden; }
+  .toggle button { border: 0; border-radius: 0; padding: 7px 14px; background: transparent; }
+  .toggle button.on { background: var(--accent); color: var(--accent-ink); }
+  .badge { position: absolute; bottom: 12px; left: 12px; right: 12px; text-align: center; pointer-events: none; }
+  .badge span { background: var(--surface); border: 1px solid var(--line); padding: 5px 11px; border-radius: 999px; font-size: .82rem; }
+  footer { color: var(--muted); font-size: .72rem; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Design my room</h1>
+    <p class="sub">Scan your room, say the vibe, and get real products placed where they fit.</p>
+
+    <section class="step">
+      <h2>1 · Scan</h2>
+      <label class="file" id="drop">
+        <input type="file" id="file" accept="video/*,.glb,.gltf,.obj,.ply">
+        <b>Upload a room video or a LiDAR scan</b><br>
+        <span id="fname">iPhone Pro: Polycam / 3D Scanner App → export GLB or OBJ. Other phones: a slow 20–30 s video walking around the room.</span>
+      </label>
+      <div class="row" style="margin-top:8px">
+        <input type="number" id="width" step="0.1" min="1" max="20" placeholder="Width (m)" title="Optional for videos: the longest wall, for exact scale">
+        <button class="primary" id="upload" disabled>Analyze</button>
+        <button id="demo">Try a demo room</button>
+      </div>
+      <p class="msg" id="scanmsg"></p>
+    </section>
+
+    <section class="step">
+      <h2>2 · Vibe</h2>
+      <div class="row">
+        <input type="text" id="vibe" placeholder="e.g. cozy mid-century with plants" value="cozy mid-century with plants">
+      </div>
+      <div class="chips" id="presets"></div>
+      <div class="row" style="margin-top:8px">
+        <select id="rtype">
+          <option value="">Room type: auto</option><option value="living">Living room</option>
+          <option value="bedroom">Bedroom</option><option value="office">Office</option><option value="nursery">Nursery / kids</option>
+        </select>
+        <button class="primary" id="plan" disabled>Decorate</button>
+      </div>
+      <p class="msg" id="planmsg"></p>
+    </section>
+
+    <section class="step" id="resultsStep" hidden>
+      <h2>3 · Your room</h2>
+      <div id="items"></div>
+      <div class="skipped" id="skipped"></div>
+    </section>
+
+    <footer>Products: Amazon Berkeley Objects (© Amazon.com, CC BY 4.0) and Objaverse/Sketchfab creators (credited per item).
+      Video-to-3D: VGGT (Meta), run locally.</footer>
+  </aside>
+
+  <div id="view">
+    <div class="toggle" hidden id="toggle"><button id="before">Before</button><button id="after" class="on">After</button></div>
+    <div class="badge"><span id="badge">Upload a scan or try the demo room</span></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const msg = (el, t, err = false) => { $(el).textContent = t; $(el).classList.toggle("err", err); };
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+
+// ---------------------------------------------------------------- scene
+const view = $("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue("--scene").trim() || "#ece8e1");
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 100);
+camera.position.set(4, 4, 6);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7d70, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(2, 5, 3);
+scene.add(sun);
+
+const roomGroup = new THREE.Group(), itemGroup = new THREE.Group(), existingGroup = new THREE.Group();
+scene.add(roomGroup, itemGroup, existingGroup);
+
+function resize() {
+  const r = view.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(1, r.height);
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+const draco = new DRACOLoader().setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/");
+const loader = new GLTFLoader().setDRACOLoader(draco);
+const cache = new Map();
+function model(url) {
+  if (!cache.has(url)) cache.set(url, loader.loadAsync(url).then((g) => g.scene));
+  return cache.get(url).then((root) => {
+    const obj = root.clone(true);
+    const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3());
+    obj.position.set(-c.x, -box.min.y, -c.z);         // origin = bottom centre (matches the planner)
+    const wrap = new THREE.Group(); wrap.add(obj);
+    return wrap;
+  });
+}
+
+// ---------------------------------------------------------------- room
+let roomId = null, roomInfo = null, plan = null, selected = -1;
+
+async function showRoom(job) {
+  roomGroup.clear(); itemGroup.clear(); existingGroup.clear();
+  roomInfo = job.room;
+  const { width: W, depth: D, x0, z0 } = roomInfo;
+  if (job.mesh_url) {                                   // LiDAR: show the real scanned surfaces
+    const g = await loader.loadAsync(job.mesh_url);
+    const m = new THREE.Matrix4().fromArray(roomInfo.transform.flat()).transpose();
+    g.scene.matrixAutoUpdate = false; g.scene.matrix.copy(m);
+    roomGroup.add(g.scene);
+  }
+  if (!job.mesh_url || true) {                          // points (video / demo; also a light overlay on meshes)
+    const buf = await (await fetch(job.points_url)).arrayBuffer();
+    const n = new Int32Array(buf, 0, 1)[0];
+    const pos = new Float32Array(buf, 4, n * 3);
+    const col = new Uint8Array(buf, 4 + n * 12, n * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3, true));
+    // cut the ceiling and the wall nearest the default camera so you can see in
+    const keep = [];
+    for (let i = 0; i < n; i++) {
+      const y = pos[i * 3 + 1], z = pos[i * 3 + 2], x = pos[i * 3];
+      if (y > 2.15) continue;
+      if (z > z0 + D - 0.06 && y > 0.04) continue;
+      if (x > x0 + W - 0.06 && y > 0.04) continue;
+      keep.push(i);
+    }
+    geo.setIndex(keep);
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.022, vertexColors: true, sizeAttenuation: true }));
+    pts.visible = !job.mesh_url;
+    roomGroup.add(pts);
+  }
+  const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(
+    [[x0, z0], [x0 + W, z0], [x0 + W, z0 + D], [x0, z0 + D]].map(([x, z]) => new THREE.Vector3(x, 0.005, z))),
+    new THREE.LineBasicMaterial({ color: 0xb5562b }));
+  roomGroup.add(outline);
+  for (const e of roomInfo.existing) {                  // what the scan already has
+    const b = new THREE.Box3(new THREE.Vector3(e.x - e.w / 2, 0, e.z - e.d / 2), new THREE.Vector3(e.x + e.w / 2, e.h, e.z + e.d / 2));
+    existingGroup.add(new THREE.Box3Helper(b, 0x6d675f));
+  }
+  const c = new THREE.Vector3(x0 + W / 2, 0.6, z0 + D / 2);
+  controls.target.copy(c);
+  camera.position.set(x0 + W + 1.6, Math.max(W, D) * 0.95 + 1.2, z0 + D + 2.2);
+  controls.update();
+  $("badge").textContent = `${W.toFixed(1)} × ${D.toFixed(1)} m · scale: ${roomInfo.scale_source} · drag to orbit`;
+  $("plan").disabled = false;
+}
+
+async function poll(id) {
+  roomId = id;
+  for (;;) {
+    const job = await (await fetch(`/api/room/${id}`)).json();
+    msg("scanmsg", job.message || job.status, job.status === "error");
+    if (job.status === "ready") { await showRoom(job); return true; }
+    if (job.status === "error") return false;
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+}
+
+$("file").onchange = () => {
+  const f = $("file").files[0];
+  $("fname").textContent = f ? `${f.name} · ${(f.size / 1e6).toFixed(1)} MB` : "";
+  $("upload").disabled = !f;
+};
+$("upload").onclick = async () => {
+  const f = $("file").files[0]; if (!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  if ($("width").value) fd.append("known_width", $("width").value);
+  $("upload").disabled = true; msg("scanmsg", "Uploading…");
+  try {
+    const r = await fetch("/api/room/upload", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    if (await poll(d.id) && $("vibe").value) decorate();
+  } catch (e) { msg("scanmsg", "Upload failed: " + e.message, true); }
+  $("upload").disabled = false;
+};
+$("demo").onclick = async () => {
+  msg("scanmsg", "Building the demo room…");
+  const d = await (await fetch("/api/room/demo", { method: "POST" })).json();
+  if (await poll(d.id) && $("vibe").value) decorate();
+};
+
+// ---------------------------------------------------------------- plan
+const PRESETS = ["cozy mid-century with plants", "cute kawaii with plushies", "minimal japandi", "boho jungle", "dark industrial", "scandinavian bedroom"];
+$("presets").innerHTML = PRESETS.map((p) => `<button class="chip">${esc(p)}</button>`).join("");
+$("presets").querySelectorAll("button").forEach((b) => b.onclick = () => { $("vibe").value = b.textContent; if (roomId) decorate(); });
+$("plan").onclick = () => decorate();
+$("vibe").onkeydown = (e) => { if (e.key === "Enter" && roomId) decorate(); };
+
+async function decorate() {
+  if (!roomId) return;
+  $("plan").disabled = true; msg("planmsg", "Picking products that fit…");
+  try {
+    const r = await fetch(`/api/room/${roomId}/plan`, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vibe: $("vibe").value, room_type: $("rtype").value || null }) });
+    plan = await r.json();
+    if (!r.ok) throw new Error(plan.detail || r.status);
+    plan.items.forEach((it) => { it.choice = 0; it.options = it.product ? [it.product, ...it.alternatives] : []; });
+    msg("planmsg", `${plan.room_type[0].toUpperCase() + plan.room_type.slice(1)} (${plan.room_type_why}). ` +
+      `${plan.items.filter((i) => !i.existing).length} products placed.`);
+    await placeAll(); renderList(); setMode(true);
+    window.__planDone = true;
+  } catch (e) { msg("planmsg", "Couldn’t plan: " + e.message, true); }
+  $("plan").disabled = false;
+}
+
+async function placeOne(it, idx) {
+  const old = itemGroup.children.find((o) => o.userData.idx === idx);
+  if (old) itemGroup.remove(old);
+  if (it.existing) return;
+  const p = it.options[it.choice];
+  const obj = await model(p.ar_model_url);
+  obj.scale.setScalar(p.scale || 1);
+  obj.position.set(...it.position);
+  obj.rotation.y = it.rotation;
+  obj.userData.idx = idx;
+  itemGroup.add(obj);
+}
+async function placeAll() { itemGroup.clear(); await Promise.all(plan.items.map(placeOne)); }
+
+function renderList() {
+  $("resultsStep").hidden = false;
+  $("items").innerHTML = plan.items.map((it, i) => {
+    const p = it.existing ? null : it.options[it.choice];
+    const n = it.options.length;
+    return `<div class="item${i === selected ? " active" : ""}" data-i="${i}">
+      ${p ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : `<div class="ph">✓</div>`}
+      <div><div class="slot">${esc(it.slot.replace(/_/g, " "))}${it.existing ? " · already yours" : ""}</div>
+        <div class="t">${p ? esc(p.title) : "Kept from your scan"}</div>
+        <div class="r">${esc(it.reason)}${p ? ` · ${Math.round(p.width_cm)}×${Math.round(p.depth_cm)}×${Math.round(p.height_cm)} cm` : ""}</div>
+        ${n > 1 ? `<div class="sw"><button data-sw="-1" data-i="${i}">‹</button>${it.choice + 1}/${n} that fit here<button data-sw="1" data-i="${i}">›</button></div>` : ""}
+      </div></div>`;
+  }).join("");
+  $("items").querySelectorAll("[data-sw]").forEach((b) => b.onclick = async (e) => {
+    e.stopPropagation();
+    const it = plan.items[+b.dataset.i];
+    it.choice = (it.choice + +b.dataset.sw + it.options.length) % it.options.length;
+    await placeOne(it, +b.dataset.i); renderList();
+  });
+  $("skipped").innerHTML = plan.skipped.length
+    ? "Not added: " + plan.skipped.map((s) => `${esc(s.slot.replace(/_/g, " "))} (${esc(s.why)})`).join("; ") : "";
+}
+
+// ---------------------------------------------------------------- before / after
+function setMode(after) {
+  itemGroup.visible = after;
+  $("toggle").hidden = false;
+  $("after").classList.toggle("on", after); $("before").classList.toggle("on", !after);
+}
+$("before").onclick = () => setMode(false);
+$("after").onclick = () => setMode(true);
+
+// /room?demo=living&vibe=...  (for screenshots / demos)
+const qs = new URLSearchParams(location.search);
+if (qs.get("demo")) {
+  if (qs.get("vibe")) $("vibe").value = qs.get("vibe");
+  fetch(`/api/room/demo?kind=${qs.get("demo")}`, { method: "POST" }).then((r) => r.json())
+    .then(async (d) => { if (await poll(d.id)) await decorate(); });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>BuyByFit Live AR</title>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  :root { --accent: #e07a4a; --ink: #fff; --glass: rgb(20 18 16 / .62); --muted: #d8d1c8; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #111; color: var(--ink); overflow: hidden;
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #cam { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+  canvas { position: fixed; inset: 0; touch-action: none; }
+
+  #start { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center;
+    background: radial-gradient(circle at 50% 30%, #3a2a20, #111 70%); z-index: 5; }
+  #start h1 { font-size: 1.6rem; margin: 0 0 8px; }
+  #start p { color: var(--muted); max-width: 32ch; margin: 0 auto 22px; }
+  #go { border: 0; border-radius: 999px; padding: 16px 30px; font: 600 1.1rem system-ui, sans-serif;
+    background: var(--accent); color: #1a0f09; cursor: pointer; box-shadow: 0 6px 20px rgb(0 0 0 / .4); }
+  #support { margin-top: 14px; font-size: .85rem; color: var(--muted); }
+  #start a { color: var(--muted); }
+
+  #overlay { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 4; }
+  #overlay > * { pointer-events: auto; }
+  #top { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 12px; right: 12px;
+    display: flex; gap: 8px; align-items: flex-start; }
+  #card { flex: 1; min-width: 0; background: var(--glass); backdrop-filter: blur(8px); border-radius: 14px;
+    padding: 10px 12px; font-size: .88rem; display: none; }
+  #card b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #card span { color: var(--muted); }
+  #exit { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--glass);
+    color: var(--ink); font-size: 1.2rem; cursor: pointer; }
+  #status { position: absolute; top: calc(70px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center;
+    pointer-events: none; padding: 0 16px; }
+  #status span { background: var(--glass); padding: 6px 12px; border-radius: 999px; font-size: .85rem; display: inline-block; }
+  #bottom { position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); }
+  #caption { min-height: 48px; background: var(--glass); backdrop-filter: blur(8px); border-radius: 14px;
+    padding: 10px 14px; margin-bottom: 10px; font-size: 1rem; }
+  #caption .interim { color: var(--muted); }
+  #caption .hintline { color: var(--muted); font-size: .82rem; }
+  #controls { display: flex; gap: 8px; justify-content: center; align-items: center; }
+  .ctl { border: 0; border-radius: 999px; padding: 11px 13px; background: var(--glass); color: var(--ink);
+    font: 600 .88rem system-ui, sans-serif; cursor: pointer; }
+  #mic { flex: none; width: 60px; height: 60px; border-radius: 50%; border: 0; background: var(--accent); color: #1a0f09;
+    display: grid; place-items: center; cursor: pointer; }
+  #mic.on { animation: pulse 1.3s infinite; }
+  #mic.off { background: #6b625a; }
+  #mic svg { width: 26px; height: 26px; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgb(224 122 74 / .6); } 50% { box-shadow: 0 0 0 14px rgb(224 122 74 / 0); } }
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted autoplay></video>
+
+<div id="start">
+  <div>
+    <h1>Talk, and it appears</h1>
+    <p>Point your camera at the floor and say what you want, e.g. “a cozy sofa, a brass floor lamp and a teddy bear”.</p>
+    <button id="go">Start camera + mic</button>
+    <div id="support">Checking AR support…</div>
+    <p style="margin-top:18px;font-size:.8rem"><a href="/">Classic search page</a></p>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="top">
+    <div id="card"><b id="ctitle"></b><span id="cmeta"></span></div>
+    <button id="exit" aria-label="Exit">✕</button>
+  </div>
+  <div id="status"><span id="stxt">Move your phone slowly to find the floor</span></div>
+  <div id="bottom">
+    <div id="caption"><span class="hintline">Say several things at once. Tap a piece to select it, then “next”, “rotate”, “put it here”, “remove”.</span></div>
+    <div id="controls">
+      <button class="ctl" id="prev">‹</button>
+      <button class="ctl" id="rot">⟳</button>
+      <button class="ctl" id="del">🗑</button>
+      <button id="mic" aria-label="Mic on/off"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg></button>
+      <button class="ctl" id="here">◎</button>
+      <button class="ctl" id="next">›</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const status = (t) => { $("status").style.display = t ? "" : "none"; $("stxt").textContent = t || ""; };
+
+// ---------------------------------------------------------------- three.js
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 50);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x887766, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(1, 3, 2);
+scene.add(sun);
+
+const ORANGE = 0xe07a4a;
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.16, 40).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.9 }));
+reticle.matrixAutoUpdate = false;
+reticle.visible = false;
+scene.add(reticle);
+
+// ring on the floor under the selected piece
+const selRing = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 64).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.85, depthTest: false }));
+selRing.renderOrder = 10;
+
+const draco = new DRACOLoader().setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/");
+const loader = new GLTFLoader().setDRACOLoader(draco);
+const modelCache = new Map();
+
+function loadModel(p) {
+  if (!modelCache.has(p.ar_model_url)) modelCache.set(p.ar_model_url, loader.loadAsync(p.ar_model_url).then((g) => g.scene));
+  return modelCache.get(p.ar_model_url).then((root) => {
+    // wrapper whose origin is the piece's bottom-centre, at real size
+    const obj = root.clone(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3());
+    obj.position.set(-centre.x, -box.min.y, -centre.z);
+    const wrap = new THREE.Group();
+    wrap.add(obj);
+    const listingMax = Math.max(p.width_cm || 0, p.depth_cm || 0, p.height_cm || 0) / 100;
+    const modelMax = Math.max(size.x, size.y, size.z);
+    let s = 1;
+    if (listingMax && modelMax) {
+      const r = listingMax / modelMax;
+      if (r < 0.75 || r > 1.33) s = r;     // model scale is off its listing: trust the listing
+    }
+    wrap.scale.setScalar(s);
+    wrap.userData.radius = Math.max(size.x, size.z) * s / 2;
+    return wrap;
+  });
+}
+
+// ---------------------------------------------------------------- the room: many pieces, one selected
+let mode = null;            // "webxr" | "camera"
+const items = [];           // { obj, product, results, idx }
+let active = null;
+const GAP = 0.25;           // metres between neighbours
+
+function viewCam() { return mode === "webxr" ? renderer.xr.getCamera() : camera; }
+function groundRight() {    // camera's right vector, flattened onto the floor
+  const v = new THREE.Vector3(1, 0, 0).applyQuaternion(viewCam().getWorldQuaternion(new THREE.Quaternion()));
+  v.y = 0;
+  return v.lengthSq() < 1e-6 ? new THREE.Vector3(1, 0, 0) : v.normalize();
+}
+
+function anchorPoint() {
+  if (mode === "webxr" && reticle.visible) return new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+  if (mode === "webxr") {   // no floor yet: 2 m ahead, 1.3 m down
+    const cam = renderer.xr.getCamera();
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion).setY(0).normalize();
+    return cam.position.clone().add(dir.multiplyScalar(2)).add(new THREE.Vector3(0, -1.3, 0));
+  }
+  if (items.length) {       // camera mode: next to what's already there
+    const c = new THREE.Vector3();
+    items.forEach((it) => c.add(it.obj.position));
+    return c.divideScalar(items.length);
+  }
+  return new THREE.Vector3(0, -1.3, -2.6);
+}
+
+// nearest spot to `anchor`, sliding sideways, where a piece of radius r doesn't overlap anything
+function freeSpot(anchor, r, ignore) {
+  const right = groundRight();
+  const clear = (c) => items.every((it) => it === ignore ||
+    Math.hypot(it.obj.position.x - c.x, it.obj.position.z - c.z) >= r + it.obj.userData.radius + GAP);
+  for (let k = 0; k < 40; k++) {
+    const step = Math.ceil(k / 2) * (k % 2 ? 1 : -1) * 0.2;   // 0, +0.2, -0.2, +0.4, ...
+    const c = anchor.clone().add(right.clone().multiplyScalar(step));
+    if (clear(c)) return c;
+  }
+  return anchor.clone().add(right.multiplyScalar(items.length * 0.6));
+}
+
+function faceViewer(obj) {
+  const c = new THREE.Vector3().setFromMatrixPosition(viewCam().matrixWorld);
+  obj.rotation.y = Math.atan2(c.x - obj.position.x, c.z - obj.position.z);
+}
+
+function select(it) {
+  active = it;
+  if (!it) { selRing.removeFromParent(); $("card").style.display = "none"; return; }
+  it.obj.add(selRing);
+  selRing.scale.setScalar((it.obj.userData.radius + 0.06) / it.obj.scale.x);
+  selRing.position.y = 0.005 / it.obj.scale.x;
+  const p = it.product;
+  $("card").style.display = "block";
+  $("ctitle").textContent = p.title;
+  $("cmeta").textContent = `${Math.round(p.width_cm)}×${Math.round(p.depth_cm)}×${Math.round(p.height_cm)} cm · `
+    + `match ${it.idx + 1}/${it.results.length} · ${items.length} in room`;
+}
+
+async function placeNew(results, anchor) {
+  const p = results[0];
+  const obj = await loadModel(p);
+  obj.position.copy(freeSpot(anchor, obj.userData.radius));
+  scene.add(obj);
+  faceViewer(obj);
+  const it = { obj, product: p, results, idx: 0 };
+  items.push(it);
+  return it;
+}
+
+async function swap(it, i) {        // same spot, next/previous match
+  if (!it || !it.results.length) return;
+  it.idx = (i + it.results.length) % it.results.length;
+  const p = it.results[it.idx];
+  status("Loading " + p.title.slice(0, 40) + "…");
+  const obj = await loadModel(p);
+  obj.position.copy(it.obj.position);
+  obj.rotation.y = it.obj.rotation.y;
+  scene.remove(it.obj);
+  it.obj = obj; it.product = p;
+  scene.add(obj);
+  obj.position.copy(freeSpot(obj.position, obj.userData.radius, it));   // bigger piece: nudge out of neighbours
+  select(it);
+  if (mode === "camera") frameAll();
+  status("");
+}
+
+function moveHere() {
+  if (!active) return;
+  active.obj.position.copy(freeSpot(anchorPoint(), active.obj.userData.radius, active));
+  faceViewer(active.obj);
+}
+function rotate(deg = 45) { if (active) active.obj.rotation.y += THREE.MathUtils.degToRad(deg); }
+function removeActive() {
+  if (!active) return;
+  scene.remove(active.obj); items.splice(items.indexOf(active), 1);
+  select(items[items.length - 1] || null);
+}
+function clearAll() { items.splice(0).forEach((x) => scene.remove(x.obj)); select(null); }
+
+// camera-preview mode: centre the group and step back until it all fits the screen width
+function frameAll() {
+  if (!items.length) return;
+  const box = new THREE.Box3();
+  items.forEach((it) => box.expandByObject(it.obj));
+  const size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3());
+  const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+  const dist = Math.min(10, Math.max(2.2, (size.x * 1.2) / (2 * Math.tan(hfov / 2)) + size.z / 2));
+  const shift = new THREE.Vector3(-centre.x, 0, -dist - centre.z);
+  items.forEach((it) => it.obj.position.add(shift));
+}
+
+async function post(path, query, k = 6) {
+  const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query, k }) });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+// one utterance -> one or more new pieces, laid out side by side
+async function addToRoom(text) {
+  status("Finding: " + text);
+  try {
+    const d = await post("/api/scene", text);
+    const groups = d.items.filter((g) => g.results.length);
+    if (!groups.length) { status("Nothing AR-ready fits that. Try another piece or a bigger space."); return; }
+    const anchor = anchorPoint();
+    let last = null;
+    for (const g of groups) last = await placeNew(g.results, anchor);
+    if (mode === "camera") frameAll();
+    select(last);
+    const missed = d.items.length - groups.length;
+    status(missed ? `Couldn’t find ${missed} of those. Try saying it differently.`
+      : mode === "webxr" && !reticle.visible ? "Placed in front of you. Find the floor, then tap it to move the selected piece." : "");
+  } catch { status("Search failed. Is the server running?"); }
+}
+
+async function replaceActive(text) {
+  if (!active) return addToRoom(text);
+  status("Swapping for: " + text);
+  try {
+    const d = await post("/api/search", text);
+    if (!d.results.length) { status("Nothing AR-ready fits that."); return; }
+    active.results = d.results;
+    await swap(active, 0);
+  } catch { status("Search failed. Is the server running?"); }
+}
+
+// ---------------------------------------------------------------- voice
+function handleUtterance(raw) {
+  const t = raw.toLowerCase().trim().replace(/[.!?]$/, "");
+  if (!t) return;
+  if (/^(next|another|different|something else|show me another)( one)?$/.test(t)) return swap(active, (active?.idx ?? 0) + 1);
+  if (/^(previous|back|go back|last one)$/.test(t)) return swap(active, (active?.idx ?? 0) - 1);
+  if (/^(rotate|turn)( it)?( around)?( left| right)?$/.test(t)) return rotate(/left/.test(t) ? -45 : /around/.test(t) ? 180 : 45);
+  if (/^(put|move|place) (it )?(here|there)$|^here$/.test(t)) return moveHere();
+  if (/^(remove|delete) (it|that|this)$|^remove$|^undo$/.test(t)) return removeActive();
+  if (/^(clear|reset|start over)( (all|everything|the room))?$/.test(t)) return clearAll();
+  const m = t.match(/^(?:replace|swap|change) (?:it|this|that) (?:with|for|to) (.+)$|^(.+) instead$/);
+  if (m) return replaceActive(m[1] || m[2]);
+  return addToRoom(t.replace(/^(add|also|plus|now add|let's add)\s+/, ""));
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, wantMic = false;
+function setCaption(finalText, interim) {
+  $("caption").innerHTML = (finalText ? esc(finalText) + " " : "") + (interim ? `<span class="interim">${esc(interim)}</span>` : "")
+    || '<span class="hintline">Listening…</span>';
+}
+if (SR) {
+  rec = new SR();
+  rec.lang = "en-US"; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) { setCaption(r[0].transcript, ""); handleUtterance(r[0].transcript); }
+      else interim += r[0].transcript;
+    }
+    if (interim) setCaption("", interim);
+  };
+  rec.onerror = (e) => { if (e.error === "not-allowed") { wantMic = false; micUi(); status("Microphone blocked. Allow it in site settings."); } };
+  rec.onend = () => { if (wantMic) setTimeout(() => { try { rec.start(); } catch {} }, 200); else micUi(); };
+}
+function micUi() { $("mic").classList.toggle("on", wantMic); $("mic").classList.toggle("off", !wantMic); }
+function startMic() { if (!rec) { status("Voice isn’t supported in this browser."); return; } wantMic = true; micUi(); try { rec.start(); } catch {} }
+function stopMic() { wantMic = false; micUi(); try { rec.stop(); } catch {} }
+
+// ---------------------------------------------------------------- buttons
+const overlay = $("overlay");
+overlay.addEventListener("beforexrselect", (e) => { if (e.target.closest("button")) e.preventDefault(); });
+$("mic").onclick = () => (wantMic ? stopMic() : startMic());
+$("next").onclick = () => swap(active, (active?.idx ?? 0) + 1);
+$("prev").onclick = () => swap(active, (active?.idx ?? 0) - 1);
+$("rot").onclick = () => rotate(45);
+$("del").onclick = () => removeActive();
+$("here").onclick = () => moveHere();
+$("exit").onclick = () => { stopMic(); if (mode === "webxr") renderer.xr.getSession()?.end(); else location.reload(); };
+
+// ---------------------------------------------------------------- tap: select a piece, or move the selected one
+const ray = new THREE.Raycaster();
+function pieceHit() {
+  const hits = ray.intersectObjects(items.map((it) => it.obj), true);
+  if (!hits.length) return null;
+  return items.find((it) => { let o = hits[0].object; while (o) { if (o === it.obj) return true; o = o.parent; } return false; });
+}
+
+// ---------------------------------------------------------------- WebXR (Android Chrome + ARCore)
+let hitSource = null;
+async function startWebXR() {
+  const session = await navigator.xr.requestSession("immersive-ar", {
+    requiredFeatures: ["hit-test"], optionalFeatures: ["dom-overlay", "local-floor"], domOverlay: { root: overlay } });
+  mode = "webxr";
+  renderer.xr.setReferenceSpaceType("local");
+  await renderer.xr.setSession(session);
+  const viewer = await session.requestReferenceSpace("viewer");
+  hitSource = await session.requestHitTestSource({ space: viewer });
+  const controller = renderer.xr.getController(0);
+  scene.add(controller);
+  controller.addEventListener("select", () => {
+    ray.setFromXRController(controller);
+    const it = pieceHit();
+    if (it) select(it); else moveHere();
+  });
+  session.addEventListener("end", () => { stopMic(); location.reload(); });
+  $("start").style.display = "none"; overlay.style.display = "block";
+}
+
+renderer.setAnimationLoop((t, frame) => {
+  if (frame && hitSource) {
+    const hits = frame.getHitTestResults(hitSource);
+    if (hits.length) {
+      reticle.visible = true;
+      reticle.matrix.fromArray(hits[0].getPose(renderer.xr.getReferenceSpace()).transform.matrix);
+      if ($("stxt").textContent.startsWith("Move your phone")) status("");
+    } else reticle.visible = false;
+  }
+  renderer.render(scene, camera);
+});
+
+// ---------------------------------------------------------------- camera fallback (iPhone / no ARCore)
+async function startCameraMode() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+  $("cam").srcObject = stream; $("cam").style.display = "block";
+  mode = "camera";
+  camera.rotation.x = -0.28;   // phone at chest height, looking slightly down
+  $("start").style.display = "none"; overlay.style.display = "block"; $("here").style.display = "none";
+  status("Preview mode: no floor tracking on this device. Tap a piece to select it, drag to turn it.");
+  setTimeout(() => { if ($("stxt").textContent.startsWith("Preview")) status(""); }, 5000);
+  let last = null, moved = 0;
+  const el = renderer.domElement;
+  el.addEventListener("pointerdown", (e) => { last = { x: e.clientX, y: e.clientY }; moved = 0; });
+  el.addEventListener("pointermove", (e) => {
+    if (!last || !active) return;
+    moved += Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y);
+    active.obj.rotation.y += (e.clientX - last.x) * 0.01;
+    last = { x: e.clientX, y: e.clientY };
+  });
+  el.addEventListener("pointerup", (e) => {
+    if (last && moved < 8) {      // a tap, not a drag
+      ray.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
+      const it = pieceHit();
+      if (it) select(it);
+    }
+    last = null;
+  });
+  addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+}
+
+// ---------------------------------------------------------------- start
+let xrOK = false;
+(async () => {
+  xrOK = !!(navigator.xr && await navigator.xr.isSessionSupported("immersive-ar").catch(() => false));
+  $("support").textContent = xrOK ? "AR with floor tracking is supported ✓"
+    : "No WebXR AR here (normal on iPhone). You’ll get live camera preview mode.";
+  if (!SR) $("support").textContent += " Voice isn’t supported in this browser.";
+})();
+
+// Desktop/demo hook: /live?demo=a sofa, a lamp and a teddy bear  -> camera preview + that query, no mic
+const demo = new URLSearchParams(location.search).get("demo");
+if (demo) startCameraMode()
+  .then(async () => { for (const part of demo.split("|")) { setCaption(part, ""); await handleUtterance(part); } })
+  .then(() => { window.__demoDone = true; })
+  .catch((e) => { $("support").textContent = "demo failed: " + e.message; window.__demoDone = true; });
+
+$("go").onclick = async () => {
+  startMic();   // the same tap unlocks the mic
+  try {
+    if (xrOK) await startWebXR(); else await startCameraMode();
+  } catch (err) {
+    $("support").textContent = "Couldn’t start: " + (err.message || err);
+    stopMic();
+  }
+};
+</script>
+</body>
+</html>

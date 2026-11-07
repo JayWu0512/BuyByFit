@@ -32,6 +32,9 @@ DEFAULT_TYPES = {
     "SOFA", "CHAIR", "TABLE", "BED", "BED_FRAME", "DESK", "OTTOMAN", "BENCH", "STOOL_SEATING",
     "SHELF", "BOOKCASE", "CABINET", "DRESSER", "NIGHTSTAND", "STORAGE_BENCH", "HOME_FURNITURE_AND_DECOR",
     "RUG", "LAMP", "MIRROR", "VANITY", "TV_STAND", "COFFEE_TABLE", "END_TABLE", "HEADBOARD", "MATTRESS",
+    # small, cute decor (most of these have 3D models in ABO)
+    "PILLOW", "PLANTER", "VASE", "BEAN_BAG_CHAIR", "CANDLE_HOLDER", "FIGURINE", "SCULPTURE", "ARTIFICIAL_PLANT",
+    "BASKET", "CLOCK", "LIGHT_FIXTURE", "HOME_MIRROR", "WALL_ART",
 }
 
 UNIT_TO_CM = {"inches": 2.54, "inch": 2.54, "in": 2.54, "centimeters": 1.0, "centimetres": 1.0, "cm": 1.0,
@@ -80,6 +83,9 @@ def all_text(entries) -> list[str]:
     return vals
 
 
+MAX_DIM_CM = 600.0
+
+
 def dim_cm(d) -> float | None:
     if not d:
         return None
@@ -89,7 +95,14 @@ def dim_cm(d) -> float | None:
     except (TypeError, ValueError):
         return None
     factor = UNIT_TO_CM.get(str(src.get("unit", "")).lower())
-    return round(v * factor, 1) if factor else None
+    if not factor:
+        return None
+    cm = round(v * factor, 1)
+    # 0 means "not filled in" in ABO, and >6 m is a unit error (e.g. Solimo sofas listed at 845 cm).
+    # Treat both as unknown so they can't slip through a room-fit filter.
+    if cm <= 0 or cm > MAX_DIM_CM:
+        return None
+    return cm
 
 
 def load_listings(listings_tar: Path):
