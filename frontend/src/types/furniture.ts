@@ -40,6 +40,11 @@ export interface FurnitureProduct {
   heightCm: number;
   imageUrl: string;
   imageAlt: string;
+  imageUrls?: string[];
+  color?: string;
+  caption?: string;
+  model3dUrl?: string;
+  arModelUrl?: string;
   retailerUrl?: string;
   displayOrder: number;
   imagePosition?: string;

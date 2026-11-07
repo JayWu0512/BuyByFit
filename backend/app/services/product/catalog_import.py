@@ -31,22 +31,22 @@ CREATE TABLE IF NOT EXISTS products (
     title TEXT NOT NULL,
     brand TEXT,
     product_type TEXT,
-    category JSONB,
-    style JSONB,
+    category TEXT[],
+    style TEXT,
     material TEXT,
     color TEXT,
     price NUMERIC,
     currency TEXT,
     description TEXT,
-    keywords JSONB,
-    image_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+    keywords TEXT[],
+    image_urls TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     model_3d_url TEXT,
     ar_model_url TEXT,
     width_cm NUMERIC,
     depth_cm NUMERIC,
     height_cm NUMERIC,
     caption TEXT,
-    vibe_tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+    vibe_tags TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     license TEXT,
     scraped_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ
@@ -74,10 +74,10 @@ _PRODUCT_UPSERT = text(
         image_urls, model_3d_url, ar_model_url, width_cm, depth_cm, height_cm,
         caption, vibe_tags, license, scraped_at, updated_at
     ) VALUES (
-        :id, :source, :source_id, :url, :title, :brand, :product_type, CAST(:category AS jsonb),
-        CAST(:style AS jsonb), :material, :color, :price, :currency, :description, CAST(:keywords AS jsonb),
-        CAST(:image_urls AS jsonb), :model_3d_url, :ar_model_url, :width_cm, :depth_cm, :height_cm,
-        :caption, CAST(:vibe_tags AS jsonb), :license, :scraped_at, :updated_at
+        :id, :source, :source_id, :url, :title, :brand, :product_type, :category,
+        :style, :material, :color, :price, :currency, :description, :keywords,
+        :image_urls, :model_3d_url, :ar_model_url, :width_cm, :depth_cm, :height_cm,
+        :caption, :vibe_tags, :license, :scraped_at, :updated_at
     )
     ON CONFLICT (id) DO UPDATE SET
         source = EXCLUDED.source,
@@ -146,11 +146,24 @@ def _as_optional_number(value: str | None) -> float | None:
     return float(value)
 
 
-def _as_json_array(value: str | None) -> str:
-    if not value:
-        return "[]"
-    parsed = json.loads(value)
-    return json.dumps(parsed if isinstance(parsed, list) else [])
+def _as_text_array(value: str | None) -> list[str]:
+    if value is None or not value.strip():
+        return []
+    normalized = value.strip()
+    try:
+        parsed = json.loads(normalized)
+    except json.JSONDecodeError:
+        # The export mixes JSON lists (categories, image URLs) with legacy
+        # single-value style labels such as "Modern". Preserve both shapes as
+        # JSON arrays instead of rejecting an otherwise usable product row.
+        parsed = normalized
+    values = parsed if isinstance(parsed, list) else [parsed]
+    return [str(item).strip() for item in values if str(item).strip()]
+
+
+def _as_optional_style(value: str | None) -> str | None:
+    values = _as_text_array(value)
+    return ", ".join(values) if values else None
 
 
 def _as_optional_text(value: str | None) -> str | None:
@@ -166,22 +179,22 @@ def _product_params(row: dict[str, str]) -> dict[str, Any]:
         "title": row["title"],
         "brand": _as_optional_text(row.get("brand")),
         "product_type": _as_optional_text(row.get("product_type")),
-        "category": _as_json_array(row.get("category")),
-        "style": _as_json_array(row.get("style")),
+        "category": _as_text_array(row.get("category")),
+        "style": _as_optional_style(row.get("style")),
         "material": _as_optional_text(row.get("material")),
         "color": _as_optional_text(row.get("color")),
         "price": _as_optional_number(row.get("price")),
         "currency": _as_optional_text(row.get("currency")),
         "description": _as_optional_text(row.get("description")),
-        "keywords": _as_json_array(row.get("keywords")),
-        "image_urls": _as_json_array(row.get("image_urls")),
+        "keywords": _as_text_array(row.get("keywords")),
+        "image_urls": _as_text_array(row.get("image_urls")),
         "model_3d_url": _as_optional_text(row.get("model_3d_url")),
         "ar_model_url": _as_optional_text(row.get("ar_model_url")),
         "width_cm": _as_optional_number(row.get("width_cm")),
         "depth_cm": _as_optional_number(row.get("depth_cm")),
         "height_cm": _as_optional_number(row.get("height_cm")),
         "caption": _as_optional_text(row.get("caption")),
-        "vibe_tags": _as_json_array(row.get("vibe_tags")),
+        "vibe_tags": _as_text_array(row.get("vibe_tags")),
         "license": _as_optional_text(row.get("license")),
         "scraped_at": _as_optional_text(row.get("scraped_at")),
         "updated_at": _as_optional_text(row.get("updated_at")),

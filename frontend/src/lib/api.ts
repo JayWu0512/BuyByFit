@@ -21,7 +21,14 @@ interface ApiProductCard {
   price: number | null;
   currency: string | null;
   image_url: string | null;
+  image_urls?: string[];
   product_url: string | null;
+  description?: string | null;
+  material?: string | null;
+  color?: string | null;
+  caption?: string | null;
+  model_3d_url?: string | null;
+  ar_model_url?: string | null;
   dimensions_cm: ApiDimensions;
   style_tags: string[];
   match_score: number;
@@ -56,13 +63,18 @@ function toFurnitureProduct(card: ApiProductCard, index: number): FurnitureProdu
     currency: card.currency ?? "USD",
     brand: card.brand ?? "Unbranded",
     retailer: retailerFromUrl(card.product_url),
-    description: "",
-    material: "",
+    description: card.description?.trim() ?? "",
+    material: card.material?.trim() ?? "",
     widthCm: card.dimensions_cm?.width ?? 0,
     depthCm: card.dimensions_cm?.depth ?? 0,
     heightCm: card.dimensions_cm?.height ?? 0,
     imageUrl: card.image_url ?? FALLBACK_IMAGE,
     imageAlt: card.name,
+    imageUrls: card.image_urls?.filter((url) => Boolean(url.trim())),
+    color: card.color?.trim() ?? undefined,
+    caption: card.caption?.trim() ?? undefined,
+    model3dUrl: card.model_3d_url?.trim() ?? undefined,
+    arModelUrl: card.ar_model_url?.trim() ?? undefined,
     retailerUrl: card.product_url ?? undefined,
     displayOrder: index,
     matchScore: card.match_score,

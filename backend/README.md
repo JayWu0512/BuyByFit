@@ -11,10 +11,30 @@ The external 3D API owns upload processing and generated model files; store only
 
 Before editing an area, check [WORKFLOW.md](WORKFLOW.md). It identifies the responsible person, the precise trigger for updating each module, and the required handoff/tests.
 
-## Temporary API server
+## Recommendation service
 
-Until the production services are available, run `python -m app.api.mock_server` from this directory. The working endpoints and request/response contracts for the preference form and product-card grid are in [app/api/MOCK_API.md](app/api/MOCK_API.md).
+The production recommendation route is `POST /api/v1/searches` in
+[`app/api/v1/searches.py`](app/api/v1/searches.py). It embeds the room brief
+with `BAAI/bge-small-en-v1.5`, retrieves the nearest candidates from pgvector,
+then applies category, budget, and dimension limits. Its result cards preserve
+the CSV product metadata: description, images, retailer URL, materials,
+dimensions, captions, and optional 3D/AR URLs.
 
-This server is an integration target, not a dependency of the current frontend MVP: `frontend/` presently renders its own local fictional catalogue. Wire the frontend to these routes only after the contract and response mapping are agreed.
+Load the local catalogue exports before starting the API:
 
-Do not create implementation files in `app/services/` until the owning member has agreed the endpoint contract in [app/api/API_CONTRACT.md](app/api/API_CONTRACT.md). The service folders are intentionally empty so Diwas, Tem, and Isaac can choose the files and internal design that suit their implementations.
+```bash
+python scripts/import_catalog.py --dry-run
+python scripts/import_catalog.py
+uvicorn app.main:app --reload
+```
+
+`RELATIONAL_DATABASE_URL` belongs in `backend/.env` (or the process
+environment) and points to PostgreSQL with the pgvector extension available.
+The importer is idempotent; the source CSV files in `infra/` are intentionally
+ignored by Git. Recommendation shaping and filter order are covered by
+`python -m unittest discover -s tests`.
+
+`python -m app.api.mock_server` remains available as a contract-only fallback.
+The endpoint field rules and examples are in
+[app/api/API_CONTRACT.md](app/api/API_CONTRACT.md) and
+[app/api/MOCK_API.md](app/api/MOCK_API.md).

@@ -70,6 +70,7 @@ export function FurnitureCard({ product, priority = false, headingLevel = 3, lin
           )}
         </div>
         <p className="product-brand">{product.brand}</p>
+        {product.description ? <p className="product-card-description">{product.description}</p> : null}
         <p className="product-dimensions">{formatDimensions(product)}</p>
         {typeof product.matchScore === "number" ? (
           <p className="product-match-score">{Math.round(product.matchScore)}% match</p>

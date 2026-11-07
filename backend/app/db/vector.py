@@ -38,13 +38,17 @@ _SIMILARITY_QUERY = text(
         p.currency,
         p.url,
         p.image_urls,
+        p.model_3d_url,
+        p.ar_model_url,
         p.width_cm,
         p.depth_cm,
         p.height_cm,
         p.description,
+        p.material,
         p.color,
         p.style,
         p.vibe_tags,
+        p.caption,
         pe.embedding <=> (:query_vector)::vector AS distance
     FROM products p
     JOIN product_embeddings pe ON pe.product_id = p.id

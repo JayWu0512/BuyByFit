@@ -894,11 +894,19 @@ h2 {
 }
 
 .product-brand,
-.product-dimensions {
+.product-dimensions,
+.product-card-description {
   margin: 0.42rem 0 0;
   color: var(--ink);
   font-size: 1rem;
   line-height: 1.45;
+}
+
+.product-card-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .product-dimensions {

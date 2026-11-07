@@ -66,8 +66,17 @@ def _match_score(distance: float) -> int:
     return min(99, round(similarity * 100))
 
 
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    return []
+
+
 def _product_card(product: dict[str, Any]) -> dict[str, Any]:
-    image_urls = product.get("image_urls") or []
+    raw_image_urls = product.get("image_urls") or []
+    image_urls = [str(url) for url in raw_image_urls if isinstance(url, str) and url.strip()] if isinstance(raw_image_urls, list) else []
     return {
         "id": product["id"],
         "name": product["title"],
@@ -76,13 +85,20 @@ def _product_card(product: dict[str, Any]) -> dict[str, Any]:
         "price": product.get("price"),
         "currency": product.get("currency"),
         "image_url": image_urls[0] if image_urls else None,
+        "image_urls": image_urls,
         "product_url": product.get("url"),
+        "description": product.get("description"),
+        "material": product.get("material"),
+        "color": product.get("color"),
+        "caption": product.get("caption"),
+        "model_3d_url": product.get("model_3d_url"),
+        "ar_model_url": product.get("ar_model_url"),
         "dimensions_cm": {
             "width": product.get("width_cm"),
             "depth": product.get("depth_cm"),
             "height": product.get("height_cm"),
         },
-        "style_tags": product.get("vibe_tags") or [],
+        "style_tags": _string_list(product.get("vibe_tags")) or _string_list(product.get("style")),
         "match_score": _match_score(product["distance"]),
         "match_reason": "Matches your style and selected room constraints.",
     }
