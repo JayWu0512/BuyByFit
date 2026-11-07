@@ -52,7 +52,9 @@ public/brand-mark.svg      BuyByFit browser icon and reusable mark
 
 ## Backend integration
 
-The backend mock server and future API contract live in [`../backend/app/api/`](../backend/app/api/). The present frontend does **not** call those endpoints. When real search is ready, replace the local submit path in `src/components/discover-view.tsx` with the agreed API client and update the frontend handling, API contract, and mock guide together.
+The search UI calls same-origin `POST /api/v1/searches`. The Next.js route at `src/app/api/v1/searches/route.ts` proxies this request server-side to `RECOMMENDATION_API_URL`, keeping the Python service URL and cross-origin access out of the browser.
+
+For local development, run the FastAPI service on port 8000 and copy `.env.example` to `.env.local`. For Vercel, deploy the Python recommendation service separately and set `RECOMMENDATION_API_URL` in the Vercel project environment variables for Production. Use the backend origin only, for example `https://buybyfit-api.example.com`—do not add `/api/v1/searches` and do not expose it through a `NEXT_PUBLIC_` variable.
 
 ## Deploy on Vercel
 

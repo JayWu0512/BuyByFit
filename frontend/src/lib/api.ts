@@ -1,9 +1,9 @@
 import { FurnitureProduct } from "@/types/furniture";
 
-// Next.js only exposes NEXT_PUBLIC_-prefixed vars to client components, and
-// only reads env files from this directory (frontend/), not the repo root.
-// See frontend/.env.example.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// The browser always talks to this Next.js route on its current origin. The
+// route proxies to RECOMMENDATION_API_URL server-side, so a production browser
+// never attempts to contact the developer's localhost or learns the backend URL.
+const SEARCH_ENDPOINT = "/api/v1/searches";
 
 const FALLBACK_IMAGE = "/images/hjem-travertine-table.jpg";
 
@@ -71,7 +71,7 @@ function toFurnitureProduct(card: ApiProductCard, index: number): FurnitureProdu
 
 /** Calls POST /api/v1/searches and maps the response into FurnitureProduct cards, best match first. */
 export async function searchFurniture(styleDescription: string): Promise<FurnitureProduct[]> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/searches`, {
+  const response = await fetch(SEARCH_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ filters: {}, style_description: styleDescription }),
