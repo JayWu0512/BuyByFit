@@ -52,7 +52,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <div className="product-detail-copy">
             <h1 className={product.name.length > 40 ? "product-title-long" : undefined} id="product-title">{product.name}</h1>
             <p className="product-detail-brand">{formatLabel(product.category)} · {product.brand} · {product.retailer}</p>
-            <p className="product-description">{product.description}</p>
+            {product.description ? <p className="product-description">{product.description}</p> : null}
 
             <dl className="product-specs">
               {product.styles.length > 0 && (

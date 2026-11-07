@@ -73,8 +73,12 @@ export function Product3DViewer({ src, poster, alt, widthCm, depthCm, heightCm }
           </p>
         </>
       ) : (
-        <button className="button product-3d-open" onClick={() => setOpen(true)} type="button">
-          View in 3D
+        <button aria-label={`Open ${alt}`} className="button product-3d-open" onClick={() => setOpen(true)} type="button">
+          <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+            <path d="m12 3 7 4v10l-7 4-7-4V7l7-4Z" />
+            <path d="m5 7 7 4 7-4M12 11v10" />
+          </svg>
+          <span>View in 3D</span>
         </button>
       )}
     </section>

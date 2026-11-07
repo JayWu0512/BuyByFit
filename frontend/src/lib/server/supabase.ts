@@ -10,7 +10,7 @@
  * It's still read from server-only env vars so the browser never talks to Supabase directly.
  */
 import type { ApiProductCard } from "@/lib/api";
-import { toFurnitureProduct } from "@/lib/api";
+import { cleanProductText, toFurnitureProduct } from "@/lib/api";
 import type { FurnitureProduct } from "@/types/furniture";
 
 import { parseBrief, type BriefHints } from "./brief";
@@ -115,7 +115,7 @@ function toCard(row: ProductRow, similarity: number | null, reason: string): Api
     image_url: images[0] ?? null,
     image_urls: images,
     product_url: row.url,
-    description: row.description,
+    description: cleanProductText(row.description) || null,
     material: row.material,
     color: row.color,
     caption: row.caption,

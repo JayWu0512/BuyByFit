@@ -7,6 +7,14 @@ const SEARCH_ENDPOINT = "/api/v1/searches";
 
 const FALLBACK_IMAGE = "/images/hjem-travertine-table.jpg";
 
+/** Removes known catalogue-export placeholders without altering real copy. */
+export function cleanProductText(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/[-–—]?\s*link removed\s*[-–—]?/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 interface ApiDimensions {
   width: number | null;
   depth: number | null;
@@ -65,7 +73,7 @@ export function toFurnitureProduct(card: ApiProductCard, index: number): Furnitu
     priceEstimate: card.price === null && card.price_estimate ? card.price_estimate : undefined,
     brand: card.brand ?? "Unbranded",
     retailer: retailerFromUrl(card.product_url),
-    description: card.description?.trim() ?? "",
+    description: cleanProductText(card.description),
     material: card.material?.trim() ?? "",
     widthCm: card.dimensions_cm?.width ?? 0,
     depthCm: card.dimensions_cm?.depth ?? 0,
