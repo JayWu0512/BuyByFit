@@ -2,9 +2,9 @@
 
 This document is the only required starting point for backend API work. Create service or production-route files only when their contract is agreed by the owning backend member and Jay.
 
-## Current frontend contract: mock API
+## Temporary API contract: mock server
 
-While `mock_server.py` is in use, its endpoints are the frontend contract:
+`mock_server.py` provides an agreed integration target while production services are designed. The current Next.js frontend is self-contained and does **not** call these endpoints yet; when it does, the implementation and this document must be updated together.
 
 | Endpoint | Owner when production replaces it | Purpose |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Exact request/response examples are in [MOCK_API.md](MOCK_API.md). The mock is t
 2. **Shared fields require agreement.** A, B, and C own their domains; Jay reviews every request or response consumed by the frontend before merge.
 3. **Version and errors.** Keep public endpoints under `/api/v1`. Return JSON errors as `{"error": {"message": "…", "status": 400}}`. Do not silently change or remove a frontend field.
 4. **Media handling.** The input form accepts an optional image/video. The production 3D provider owns uploaded binaries; persist only approved metadata, job status, and safe result URLs. Never return credentials.
-5. **Card response.** Product-grid results must continue to expose `id`, `name`, `price`, `currency`, `image_url`, `product_url`, `dimensions_cm`, `style_tags`, `match_score`, and `match_reason` unless Jay agrees to a coordinated frontend change.
+5. **Card response.** Product-grid results must continue to expose `id`, `name`, `price`, `currency`, `image_url`, `image_urls`, `product_url`, `description`, `material`, `color`, `caption`, `model_3d_url`, `ar_model_url`, `dimensions_cm`, `style_tags`, `match_score`, and `match_reason` unless Jay agrees to a coordinated frontend change. `product_url` is the real retailer destination and must be safe to open in a new tab.
 6. **Tests with changes.** Each new or changed endpoint requires an API contract test and an update to this document, the relevant frontend client, and the owner handoff in `WORKFLOW.md`.
 
 ## First production contracts to agree

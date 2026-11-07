@@ -1,6 +1,6 @@
 # BuyByFit mock API
 
-This is a dependency-free local API for Jay to connect the two frontend pages before the real database, recommendation engine, and 3D provider are available.
+This is a dependency-free local API for contract testing before the real database, recommendation engine, and 3D provider are available. The current Next.js MVP uses its own local fictional catalogue and does not call this server yet.
 
 ```bash
 cd backend

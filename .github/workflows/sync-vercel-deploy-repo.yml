@@ -1,0 +1,37 @@
+name: Sync Vercel deploy repository
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-frontend:
+    name: Mirror frontend to deploy repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the source repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # The push below authenticates with DEPLOY_REPO_TOKEN. Do not leave
+          # checkout's source-repo GITHUB_TOKEN in Git config, or GitHub sees
+          # github-actions[bot] instead of the deployment-mirror token.
+          persist-credentials: false
+
+      - name: Split and publish frontend
+        env:
+          DEPLOY_REPO_TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          DEPLOY_REPO: JayWu0512/buy-by-fit
+        run: |
+          if [ -z "$DEPLOY_REPO_TOKEN" ]; then
+            echo "::notice::Deploy mirror was skipped because DEPLOY_REPO_TOKEN is not configured."
+            exit 0
+          fi
+
+          split_commit=$(git subtree split --prefix=frontend)
+          git push --force "https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/${DEPLOY_REPO}.git" "${split_commit}:main"
