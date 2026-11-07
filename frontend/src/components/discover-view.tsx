@@ -1,13 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { FurnitureCard } from "@/components/furniture-card";
 import { RoomVisualizer } from "@/components/room-visualizer";
 import { searchFurniture } from "@/lib/api";
-import { comparePrice } from "@/lib/catalog";
-import { CatalogSort, FurnitureProduct } from "@/types/furniture";
+import { FurnitureProduct } from "@/types/furniture";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -43,18 +42,11 @@ const starterBriefs = [
   "A dining corner with sculptural wood, soft light, and room for friends.",
 ];
 
-const sortOptions: Array<{ value: CatalogSort; label: string }> = [
-  { value: "recommended", label: "BuyByFit order" },
-  { value: "price-asc", label: "Price: low to high" },
-  { value: "price-desc", label: "Price: high to low" },
-  { value: "name-asc", label: "Name: A to Z" },
-];
-
 const searchSessionKey = "buybyfit-room-brief";
 
-function saveSearchState(brief: string, sort: CatalogSort, results: FurnitureProduct[]) {
+function saveSearchState(brief: string, results: FurnitureProduct[]) {
   try {
-    sessionStorage.setItem(searchSessionKey, JSON.stringify({ brief, sort, results }));
+    sessionStorage.setItem(searchSessionKey, JSON.stringify({ brief, results }));
   } catch {
     // The search still works when a browser denies session storage.
   }
@@ -68,20 +60,10 @@ function clearSearchState() {
   }
 }
 
-function sortFurniture(products: FurnitureProduct[], sort: CatalogSort) {
-  return [...products].sort((a, b) => {
-    if (sort === "price-asc") return comparePrice(a, b, "asc");
-    if (sort === "price-desc") return comparePrice(a, b, "desc");
-    if (sort === "name-asc") return a.name.localeCompare(b.name);
-    return a.displayOrder - b.displayOrder;
-  });
-}
-
 export function DiscoverView() {
   const [brief, setBrief] = useState("");
   const [submittedBrief, setSubmittedBrief] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [sort, setSort] = useState<CatalogSort>("recommended");
   const [isListening, setIsListening] = useState(false);
   const [voiceMessage, setVoiceMessage] = useState("");
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -90,7 +72,7 @@ export function DiscoverView() {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const results = useMemo(() => sortFurniture(searchResults, sort), [searchResults, sort]);
+  const results = searchResults;
 
   useEffect(() => {
     const recognitionWindow = window as typeof window & {
@@ -107,16 +89,13 @@ export function DiscoverView() {
       const savedSearch = sessionStorage.getItem(searchSessionKey);
       if (!savedSearch) return;
 
-      const savedState = JSON.parse(savedSearch) as { brief?: unknown; sort?: unknown; results?: unknown };
+      const savedState = JSON.parse(savedSearch) as { brief?: unknown; results?: unknown };
       if (typeof savedState.brief !== "string" || savedState.brief.trim() === "") return;
 
       setBrief(savedState.brief);
       setSubmittedBrief(savedState.brief);
       if (Array.isArray(savedState.results)) {
         setSearchResults(savedState.results as FurnitureProduct[]);
-      }
-      if (typeof savedState.sort === "string" && sortOptions.some((option) => option.value === savedState.sort)) {
-        setSort(savedState.sort as CatalogSort);
       }
     } catch {
       clearSearchState();
@@ -145,7 +124,7 @@ export function DiscoverView() {
     try {
       const products = await searchFurniture(trimmedBrief);
       setSearchResults(products);
-      saveSearchState(trimmedBrief, sort, products);
+      saveSearchState(trimmedBrief, products);
       setSubmittedBrief(trimmedBrief);
     } catch {
       setError("We couldn't reach the recommendation service. Check that the backend is running and try again.");
@@ -159,13 +138,6 @@ export function DiscoverView() {
     setSubmittedBrief(null);
     setSearchResults([]);
     window.setTimeout(() => promptRef.current?.focus(), 0);
-  };
-
-  const updateSort = (nextSort: CatalogSort) => {
-    setSort(nextSort);
-    if (submittedBrief) {
-      saveSearchState(submittedBrief, nextSort, searchResults);
-    }
   };
 
   const toggleVoiceInput = () => {
@@ -363,23 +335,12 @@ export function DiscoverView() {
             <div className="search-results-copy">
               <h1 id="results-heading">Furniture for your room</h1>
               <p className="submitted-brief">“{submittedBrief}”</p>
-              <p className="mock-results-note">Ranked live against our real product catalog -- still early, so results and coverage are limited.</p>
             </div>
 
             <div className="results-actions">
-              <button className="text-button" onClick={startOver} type="button">
-                Edit your brief
+              <button className="button button-dark" onClick={startOver} type="button">
+                Change your room brief
               </button>
-              <label className="sort-control">
-                <span>Arrange</span>
-                <select onChange={(event) => updateSort(event.target.value as CatalogSort)} value={sort}>
-                  {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
           </div>
 

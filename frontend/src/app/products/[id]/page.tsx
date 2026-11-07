@@ -6,7 +6,7 @@ import { FurnitureCard } from "@/components/furniture-card";
 import { Product3DViewer } from "@/components/product-3d-viewer";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { formatDimensions, formatLabel, getFurnitureById, getRelatedFurniture, priceLabel, toClassToken } from "@/lib/catalog";
+import { formatDimensions, formatLabel, getFurnitureById, getRelatedFurniture, toClassToken } from "@/lib/catalog";
 import { furnitureProducts } from "@/lib/mock-furniture";
 import { getCatalogProduct, getRelatedCatalogProducts } from "@/lib/server/supabase";
 
@@ -51,15 +51,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
           <div className="product-detail-copy">
             <h1 className={product.name.length > 40 ? "product-title-long" : undefined} id="product-title">{product.name}</h1>
-            <p className={`product-detail-price${priceLabel(product).kind === "estimate" ? " product-price-estimate" : ""}`}>
-              {priceLabel(product).text}
-            </p>
-            {product.priceEstimate && product.price === null ? (
-              <p className="product-price-note">
-                Estimated from {product.priceEstimate.basis ?? "size, material and brand"}. This retailer listing has no
-                price on file, so check the live price before you buy.
-              </p>
-            ) : null}
             <p className="product-detail-brand">{formatLabel(product.category)} · {product.brand} · {product.retailer}</p>
             <p className="product-description">{product.description}</p>
 

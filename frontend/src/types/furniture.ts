@@ -57,17 +57,3 @@ export interface FurnitureProduct {
   // absent on the static mock catalogue.
   matchScore?: number;
 }
-
-export type CatalogSort = "recommended" | "price-asc" | "price-desc" | "name-asc";
-
-export interface CatalogFilters {
-  query: string;
-  selectedStyles: string[];
-  category: string;
-  maxWidth: string;
-  maxDepth: string;
-  maxHeight: string;
-  minPrice: string;
-  maxPrice: string;
-  sort: CatalogSort;
-}

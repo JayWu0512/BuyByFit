@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { formatDimensions, formatLabel, priceLabel, toClassToken } from "@/lib/catalog";
+import { formatDimensions, formatLabel, toClassToken } from "@/lib/catalog";
 import { FurnitureProduct } from "@/types/furniture";
 
 interface FurnitureCardProps {
@@ -64,20 +64,6 @@ export function FurnitureCard({ product, priority = false, headingLevel = 3, lin
               )}
             </ProductHeading>
           </div>
-          {(() => {
-            const label = priceLabel(product);
-            if (label.kind === "real") return <p className="product-price">{label.text}</p>;
-            if (label.kind === "estimate")
-              return (
-                <p
-                  className="product-price product-price-estimate"
-                  title={`Estimated from ${product.priceEstimate?.basis ?? "size, material and brand"}. Check the retailer for the live price.`}
-                >
-                  {label.text}
-                </p>
-              );
-            return <p className="product-price product-price-unavailable">{label.text}</p>;
-          })()}
         </div>
         <p className="product-brand">{product.brand}</p>
         {product.description ? <p className="product-card-description">{product.description}</p> : null}

@@ -773,25 +773,6 @@ h2 {
   color: var(--timber-dark);
 }
 
-.sort-control {
-  display: grid;
-  gap: 0.38rem;
-  color: var(--soft-ink);
-  font-size: 0.94rem;
-  font-weight: 600;
-}
-
-.sort-control select {
-  min-height: 2.8rem;
-  border: 0;
-  border-radius: 0;
-  padding: 0.5rem 2.2rem 0.5rem 0.75rem;
-  color: var(--ink);
-  background: var(--oat);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
 .result-count {
   margin: clamp(2.5rem, 5vw, 5rem) 0 2.2rem;
   color: var(--soft-ink);
@@ -885,25 +866,6 @@ h2 {
   text-underline-offset: 0.24rem;
 }
 
-.product-price {
-  flex: none;
-  margin: 0.14rem 0 0;
-  font-size: 1rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Estimated ranges (catalogue products with no real price): still a price, visibly softer than a real one. */
-.product-price-estimate {
-  color: var(--timber-dark);
-  font-weight: 600;
-  cursor: help;
-}
-
-.product-detail-price.product-price-estimate {
-  cursor: default;
-}
-
 .product-3d-badge {
   position: absolute;
   top: 0.75rem;
@@ -942,14 +904,6 @@ h2 {
   margin: 0.5rem 0 0;
   color: var(--soft-ink);
   font-size: 0.85rem;
-}
-
-.product-price-note {
-  margin: 0.4rem 0 0;
-  max-width: 44ch;
-  color: var(--soft-ink);
-  font-size: 0.85rem;
-  line-height: 1.45;
 }
 
 .product-brand,
@@ -1027,16 +981,8 @@ h2 {
   padding: 6%;
 }
 
-.product-detail-price {
-  margin: 1.5rem 0 0;
-  font-family: var(--display);
-  font-size: clamp(2rem, 2.6vw, 3rem);
-  font-weight: 600;
-  letter-spacing: -0.04em;
-}
-
 .product-detail-brand {
-  margin: 0.35rem 0 0;
+  margin: 1.5rem 0 0;
   color: var(--ink);
   font-size: 1rem;
 }
@@ -1432,14 +1378,6 @@ h2 {
   .results-actions {
     width: 100%;
     justify-items: start;
-  }
-
-  .sort-control {
-    width: 100%;
-  }
-
-  .sort-control select {
-    width: 100%;
   }
 
   .furniture-grid {
