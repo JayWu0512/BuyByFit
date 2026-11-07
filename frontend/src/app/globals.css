@@ -1941,6 +1941,108 @@ h2 {
   font-size: 0.86rem;
 }
 
+/* "How does this look?" under the render: labels for the reviewer model. */
+
+.rv-feedback {
+  max-width: 760px;
+  margin-top: 1rem;
+}
+
+.rv-feedback-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rv-feedback-ask p {
+  margin: 0 0.4rem 0 0;
+  font-family: var(--display);
+  font-size: 1.05rem;
+}
+
+.rv-feedback-ask .button {
+  min-height: 40px;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--line);
+}
+
+.rv-feedback-issues {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.rv-feedback-issues legend {
+  padding: 0 0.3rem;
+  font-family: var(--display);
+  font-size: 1.05rem;
+}
+
+.rv-feedback-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.rv-feedback-chips button {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--soft-ink);
+  background: var(--paper);
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.rv-feedback-chips button.is-on {
+  border-color: var(--ink);
+  color: var(--surface);
+  background: var(--ink);
+}
+
+.rv-feedback-note {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  color: var(--soft-ink);
+  font-size: 0.88rem;
+}
+
+.rv-feedback-note textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  background: var(--paper);
+  font: inherit;
+  font-size: 1rem; /* 16px keeps iPhone Safari from zooming in */
+  resize: vertical;
+}
+
+.rv-feedback-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+
+.rv-feedback-actions .button:disabled {
+  opacity: 0.45;
+  transform: none;
+}
+
+.rv-feedback-thanks {
+  margin: 1rem 0 0;
+  color: var(--soft-ink);
+  font-size: 0.92rem;
+}
+
 @media (max-width: 760px) {
   .rv-result-actions {
     width: 100%;
