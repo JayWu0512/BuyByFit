@@ -2,9 +2,9 @@
 
 This document is the only required starting point for backend API work. Create service or production-route files only when their contract is agreed by the owning backend member and Jay.
 
-## Current frontend contract: mock API
+## Temporary API contract: mock server
 
-While `mock_server.py` is in use, its endpoints are the frontend contract:
+`mock_server.py` provides an agreed integration target while production services are designed. The current Next.js frontend is self-contained and does **not** call these endpoints yet; when it does, the implementation and this document must be updated together.
 
 | Endpoint | Owner when production replaces it | Purpose |
 | --- | --- | --- |

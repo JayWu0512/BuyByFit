@@ -11,8 +11,10 @@ The external 3D API owns upload processing and generated model files; store only
 
 Before editing an area, check [WORKFLOW.md](WORKFLOW.md). It identifies the responsible person, the precise trigger for updating each module, and the required handoff/tests.
 
-## Temporary frontend API
+## Temporary API server
 
 Until the production services are available, run `python -m app.api.mock_server` from this directory. The working endpoints and request/response contracts for the preference form and product-card grid are in [app/api/MOCK_API.md](app/api/MOCK_API.md).
+
+This server is an integration target, not a dependency of the current frontend MVP: `frontend/` presently renders its own local fictional catalogue. Wire the frontend to these routes only after the contract and response mapping are agreed.
 
 Do not create implementation files in `app/services/` until the owning member has agreed the endpoint contract in [app/api/API_CONTRACT.md](app/api/API_CONTRACT.md). The service folders are intentionally empty so Diwas, Tem, and Isaac can choose the files and internal design that suit their implementations.

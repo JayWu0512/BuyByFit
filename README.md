@@ -1,48 +1,57 @@
 # BuyByFit
 
-A smart furniture shopping platform that helps users discover furniture matching their room's style and dimensions, with personalized recommendations, automatic room measurements, and realistic 3D previews.
+BuyByFit helps people discover furniture for the room they actually have. The current deliverable is a polished, Scandinavian-inspired frontend MVP: visitors describe a room naturally, optionally dictate a brief, and then browse a fictional catalogue with clear dimensions and materials.
 
-## Project structure
+## Current status
 
-```text
-frontend/                         # Customer-facing application
-  src/
-    features/                      # product browsing, recommendations, room upload, 3D preview
-    components/                    # shared UI components
-    lib/                           # API client and shared utilities
+- `frontend/` is a working Next.js 15 application with local mock data and fictional product photography.
+- A free-form room brief is the primary discovery flow; all non-empty briefs intentionally return the same 16 mock products until AI search is connected.
+- Search copy and sort state persist within the browser tab when a visitor opens a product and returns to results.
+- Product details deliberately disable purchasing because retailer URLs are not yet verified.
+- `backend/` documents the planned API and provides a separate temporary mock server, but the frontend does not currently call it.
 
-backend/
-  app/
-    api/                           # mock server and API contract documentation
-    services/
-      product/                     # product ingestion, normalization, catalog search
-      logic/                       # filters and recommendation/ranking logic
-      three_d/                     # room analysis, scene creation, visualization contracts
-    db/                            # relational and vector database adapters
+## Quick start
 
-docs/                              # architecture and integration decisions
-infra/                             # deployment and local-infrastructure configuration
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-The backend is deliberately lightweight at this stage. Each service may call the database adapter it needs; API contracts live in [backend/app/api/API_CONTRACT.md](backend/app/api/API_CONTRACT.md). The 3D provider client will live within Isaac's `three_d` service when it is implemented. 3D assets and rendering are managed by the external API, so this repository does not keep a local `storage/` directory. See [the architecture note](docs/architecture.md) for the intended flow.
+Open [http://localhost:3000](http://localhost:3000). Before sharing a change, run:
 
-## Team ownership
+```bash
+cd frontend
+npm run typecheck
+npm run build
+```
 
-| Owner | Scope | Primary directories | Deliverables |
-| --- | --- | --- | --- |
-| **A — Diwas** | Product data | `backend/app/services/product/` | Scraping/API ingestion, normalization, catalog fields, relational product records |
-| **B — Tem** | Recommendation logic | `backend/app/services/logic/`, vector DB adapter | Dimension/style filters, embeddings, similarity search, ranking and recommendation explanations |
-| **C — Isaac** | 3D integration | `backend/app/services/three_d/` | Room-input contract, external 3D API client, room attributes, scene/preview job status |
-| **D — Jay** | Frontend | `frontend/` | Product discovery UI, recommendation results, room upload, 3D preview UI, API client integration |
+For routes, project layout, browser support, mock-data boundaries, and integration notes, see [frontend/README.md](frontend/README.md).
 
-## Collaboration rules
+## Repository layout
 
-1. Keep implementation changes inside your owned directories. Discuss changes to `backend/app/api/API_CONTRACT.md`, `backend/app/db/`, or shared documentation with the affected owner before merging.
-2. Define or update the request/response contract in `backend/app/api/API_CONTRACT.md` before connecting frontend and backend.
-3. The request path is `frontend → API → service → database/external API`. Do not mix another owner's product, ranking, or 3D concerns into your service.
-4. The 3D provider receives the room input through its API. Persist only the returned job ID, status, room attributes, and safe preview/scene URLs in the relational database—never API keys or generated binary assets.
-5. Keep all credentials in `.env`; use `.env.example` only for non-secret variable names and sample values.
+```text
+frontend/     Customer-facing Next.js MVP and static demonstration assets
+backend/      API contract, temporary mock server, and future service boundaries
+docs/         Architecture and integration decisions
+infra/        Deployment and local-infrastructure notes
+```
 
-For the exact owner and update trigger of every backend area, read [the backend workflow](backend/WORKFLOW.md) before starting a task.
+## Planned architecture
 
-The initial API rules and the temporary frontend contract are in [backend/app/api/API_CONTRACT.md](backend/app/api/API_CONTRACT.md); the individual service folders intentionally start empty.
+```text
+BuyByFit frontend
+  └─ Search/recommendation API
+       ├─ Product catalogue service ──> relational database
+       ├─ Recommendation service ─────> vector + relational databases
+       └─ Optional room/3D service ───> external 3D provider
+```
+
+The frontend must use an agreed API contract before production services are connected. See [the API contract](backend/app/api/API_CONTRACT.md), [the mock API guide](backend/app/api/MOCK_API.md), and [the architecture note](docs/architecture.md).
+
+## Collaboration and safety
+
+- Keep frontend implementation inside `frontend/`; coordinate changes to API contracts and shared documentation with the relevant owners.
+- Never commit `.env` files, API keys, database volumes, generated assets, `node_modules`, or Next.js build output.
+- All current products, prices, retailers, and imagery are fictional demonstration content. Do not publish them as real inventory.
+- The detailed ownership and handoff rules are in [backend/WORKFLOW.md](backend/WORKFLOW.md).
