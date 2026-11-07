@@ -38,3 +38,22 @@ ignored by Git. Recommendation shaping and filter order are covered by
 The endpoint field rules and examples are in
 [app/api/API_CONTRACT.md](app/api/API_CONTRACT.md) and
 [app/api/MOCK_API.md](app/api/MOCK_API.md).
+
+## Room visualization service (Isaac)
+
+`app/api/v1/rooms.py` + `app/services/three_d/` power "See these pieces in your room" on Discover: a room photo,
+the brief and the search results go in; the room comes back restyled with some of those products at their real
+size. Contract: [API_CONTRACT.md](app/api/API_CONTRACT.md) -> Room visualization.
+
+It calls Gemini on Vertex AI with Google Application Default Credentials:
+
+```bash
+gcloud auth application-default login     # once, locally; a service account on a server
+# optional: GOOGLE_CLOUD_PROJECT=buybyfit  (else the credentials' quota project)
+uvicorn app.main:app --reload --port 8000
+```
+
+Photos and renders are written to `backend/storage/rooms/` (gitignored) for now; `storage.py` is the only module
+to change when they move to a storage bucket. Models are set by `THREE_D_DESIGN_MODEL`, `THREE_D_FAST_MODEL` and
+`THREE_D_IMAGE_MODEL` (defaults: gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-image).
+A run takes ~30-60 s; Vertex's per-minute quota on a new project can add retries (429) on top.

@@ -267,3 +267,6 @@ redis-data/
 
 # ABO import output and download cache
 **/data/abo/
+
+# Room visualization: local photos and renders (see backend/app/services/three_d/storage.py)
+backend/storage/

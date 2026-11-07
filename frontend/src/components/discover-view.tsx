@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { FurnitureCard } from "@/components/furniture-card";
+import { RoomVisualizer } from "@/components/room-visualizer";
 import { searchFurniture } from "@/lib/api";
 import { comparePrice } from "@/lib/catalog";
 import { CatalogSort, FurnitureProduct } from "@/types/furniture";
@@ -385,6 +386,8 @@ export function DiscoverView() {
           <p className="result-count" aria-live="polite">
             {results.length > 0 ? `${results.length} pieces found` : "No matches yet"}
           </p>
+
+          {results.length > 0 ? <RoomVisualizer brief={submittedBrief} products={searchResults} /> : null}
 
           {results.length > 0 ? (
             <div className="furniture-grid">
