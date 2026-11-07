@@ -1031,7 +1031,50 @@ h2 {
 }
 
 .related-section {
-  padding-top: var(--space-5);
+  padding-top: clamp(4rem, 7vw, 7rem);
+}
+
+/* Related pieces are a quiet next step after the main product, not a second
+   primary catalogue. Keep their scale deliberately smaller. */
+.related-section .related-heading {
+  max-width: 1120px;
+  margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.related-section .related-heading h2 {
+  max-width: 14ch;
+  font-size: clamp(2rem, 3.2vw, 3.45rem);
+}
+
+.related-section .related-grid {
+  max-width: 1120px;
+  gap: clamp(1rem, 2vw, 1.6rem);
+}
+
+.related-grid .product-image-stage {
+  aspect-ratio: 5 / 4;
+}
+
+.related-grid .product-card-details {
+  padding-top: 0.7rem;
+}
+
+.related-grid .product-category,
+.related-grid .product-brand,
+.related-grid .product-dimensions,
+.related-grid .product-card-description,
+.related-grid .product-match-score {
+  font-size: 0.88rem;
+}
+
+.related-grid .product-card-heading h3 {
+  font-size: clamp(1.1rem, 1.5vw, 1.3rem);
+}
+
+.related-grid .product-brand,
+.related-grid .product-dimensions,
+.related-grid .product-card-description {
+  margin-top: 0.3rem;
 }
 
 .not-found-page {
