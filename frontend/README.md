@@ -53,3 +53,9 @@ public/brand-mark.svg      BuyByFit browser icon and reusable mark
 ## Backend integration
 
 The backend mock server and future API contract live in [`../backend/app/api/`](../backend/app/api/). The present frontend does **not** call those endpoints. When real search is ready, replace the local submit path in `src/components/discover-view.tsx` with the agreed API client and update the frontend handling, API contract, and mock guide together.
+
+## Deploy on Vercel
+
+The deployment repository is [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit). The source repository publishes this directory to that repository's `main` branch through [the sync workflow](../.github/workflows/sync-vercel-deploy-repo.yml) after each merge to source `main`.
+
+In Vercel, import `buy-by-fit` and use its repository root as the project root. Vercel auto-detects Next.js; use `npm ci` to install and `npm run build` to build. Node.js `>=20.9.0` is declared in `package.json`.

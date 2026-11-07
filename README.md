@@ -28,6 +28,19 @@ npm run build
 
 For routes, project layout, browser support, mock-data boundaries, and integration notes, see [frontend/README.md](frontend/README.md).
 
+## Vercel deployment
+
+Vercel should import [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit), not this collaboration repository. The GitHub Actions workflow at [`.github/workflows/sync-vercel-deploy-repo.yml`](.github/workflows/sync-vercel-deploy-repo.yml) mirrors this repository's `frontend/` directory to that deployment repository whenever `main` changes. This keeps the team workflow simple: contributors merge only into this repository, and Vercel deploys the mirrored result.
+
+One repository secret is required in **JayWu0512/BuyByFit**:
+
+1. Create a fine-grained GitHub personal access token that has **Contents: Read and write** access to **only** `JayWu0512/buy-by-fit`.
+2. Add it as the Actions secret `DEPLOY_REPO_TOKEN` in the source repository.
+3. Ensure `buy-by-fit` is a dedicated deployment mirror. Its `main` branch will be replaced by the contents of `frontend/` on each successful source-repository merge.
+4. Import `buy-by-fit` into Vercel with **Root Directory** set to `./`, **Install Command** `npm ci`, and **Build Command** `npm run build`. Vercel detects Next.js automatically.
+
+`frontend/package.json` declares Node.js `>=20.9.0`, and `package-lock.json` is committed, so Vercel uses a reproducible dependency graph. No `vercel.json` is needed for this standard Next.js deployment.
+
 ## Repository layout
 
 ```text
