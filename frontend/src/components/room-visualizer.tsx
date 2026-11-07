@@ -5,7 +5,16 @@
 import Link from "next/link";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 
-import { createRoom, getVisualization, startVisualization, VisualizationJob, VisualizationResult } from "@/lib/rooms";
+import {
+  createRoom,
+  FEEDBACK_ISSUES,
+  FeedbackIssue,
+  getVisualization,
+  sendFeedback,
+  startVisualization,
+  VisualizationJob,
+  VisualizationResult,
+} from "@/lib/rooms";
 import { FurnitureProduct } from "@/types/furniture";
 
 interface RoomVisualizerProps {
@@ -70,6 +79,114 @@ function saveRoom(saved: SavedRoom | null) {
   } catch {
     // Still works without session storage; the picture just isn't kept across pages.
   }
+}
+
+const feedbackKey = (jobId: string) => `buybyfit-feedback-${jobId}`;
+
+/** "How does this look?": a person's verdict on one restyle. These labels train the reviewer model. */
+function RestyleFeedback({ roomId, jobId }: { roomId: string; jobId: string }) {
+  // Only rendered after a result exists (client side), so reading session storage here is safe.
+  const [state, setState] = useState<"ask" | "issues" | "sent">(() => {
+    try {
+      return sessionStorage.getItem(feedbackKey(jobId)) ? "sent" : "ask";
+    } catch {
+      return "ask";
+    }
+  });
+  const [sending, setSending] = useState(false);
+  const [issues, setIssues] = useState<FeedbackIssue[]>([]);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = async (verdict: "good" | "bad") => {
+    setSending(true);
+    setError("");
+    try {
+      await sendFeedback(roomId, jobId, { verdict, issues: verdict === "bad" ? issues : [], note: note.trim() });
+      try {
+        sessionStorage.setItem(feedbackKey(jobId), verdict);
+      } catch {
+        // Only stops us from asking twice in this tab.
+      }
+      setState("sent");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send that.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const toggle = (id: FeedbackIssue) =>
+    setIssues((current) => (current.includes(id) ? current.filter((i) => i !== id) : [...current, id]));
+
+  if (state === "sent") {
+    return (
+      <p className="rv-feedback-thanks" role="status">
+        Thanks, that helps us get these right.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rv-feedback">
+      {state === "ask" ? (
+        <div className="rv-feedback-ask">
+          <p>How does this look?</p>
+          <button className="button rv-light" disabled={sending} onClick={() => submit("good")} type="button">
+            {sending ? "Sending…" : "Looks right"}
+          </button>
+          <button className="button rv-light" disabled={sending} onClick={() => setState("issues")} type="button">
+            Something&apos;s off
+          </button>
+        </div>
+      ) : (
+        <fieldset className="rv-feedback-issues" disabled={sending}>
+          <legend>What&apos;s off? Pick any that apply.</legend>
+          <div className="rv-feedback-chips">
+            {FEEDBACK_ISSUES.map((issue) => (
+              <button
+                aria-pressed={issues.includes(issue.id)}
+                className={issues.includes(issue.id) ? "is-on" : undefined}
+                key={issue.id}
+                onClick={() => toggle(issue.id)}
+                type="button"
+              >
+                {issue.label}
+              </button>
+            ))}
+          </div>
+          <label className="rv-feedback-note">
+            <span>Anything else? (optional)</span>
+            <textarea
+              maxLength={500}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="e.g. it removed my bed"
+              rows={2}
+              value={note}
+            />
+          </label>
+          <div className="rv-feedback-actions">
+            <button
+              className="button button-dark"
+              disabled={issues.length === 0 && !note.trim()}
+              onClick={() => submit("bad")}
+              type="button"
+            >
+              {sending ? "Sending…" : "Send"}
+            </button>
+            <button className="text-button" onClick={() => setState("ask")} type="button">
+              Cancel
+            </button>
+          </div>
+        </fieldset>
+      )}
+      {error ? (
+        <p className="room-visualizer-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function productHref(id: string) {
@@ -469,6 +586,8 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
                 })
               : null}
           </div>
+
+          {roomId && result.job_id ? <RestyleFeedback jobId={result.job_id} key={result.job_id} roomId={roomId} /> : null}
 
           <h4 className="rv-section-title">Pieces in this picture</h4>
           <ol className="rv-pieces">

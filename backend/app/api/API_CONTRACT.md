@@ -44,8 +44,9 @@ which forward to this service (`ROOM_API_URL`, else `RECOMMENDATION_API_URL`).
 | `POST /api/v1/rooms` | multipart: `photo` (JPEG/PNG, <= 15 MB), optional `pitch_deg` (phone tilt, -60..89, from the in-page camera) | `201 {room_id, scene, photo_url}` |
 | `POST /api/v1/rooms/{room_id}/visualizations` | `{brief, products: [{id, name, category, width_cm, depth_cm, height_cm, image_url, product_url}]}` (1–30 search results) | `202 {job_id}` |
 | `GET /api/v1/visualizations/{job_id}` | — | `{status: queued\|running\|done\|error, stage: design\|place\|render\|verify\|done, elapsed_s, info: {guide_url?}, result?, error?}` |
+| `POST /api/v1/rooms/{room_id}/visualizations/{job_id}/feedback` | `{verdict: good\|bad, issues: [removed_existing\|missing_piece\|floating\|wrong_size\|wrong_product\|wrong_orientation\|blocks_path\|room_changed\|artifacts\|off_brief\|unrealistic], note?}` (note <= 500 chars; sending again replaces it) | `201 {ok: true}`; `404` if that render doesn't exist |
 | `GET /api/v1/rooms/{room_id}/files/{name}` | — | the room photo, placement guide or render (image) |
 
-`result`: `{vibe, photo_url, render_url, items: [{role, product: {id, name, category, image_url, product_url, size_cm}, placed_at_true_size, alternatives: [...]}], styling: [str], timings_s}`.
+`result`: `{job_id, vibe, photo_url, render_url, items: [{role, product: {id, name, category, image_url, product_url, size_cm}, placed_at_true_size, alternatives: [...]}], styling: [str], timings_s}`.
 A run takes ~30–60 s (Gemini on Vertex: design, true-size placement, image render, size check, one retry), so it
 is a background job polled every ~2.5 s. Errors use the usual `{"error": {"message", "status"}}` shape.

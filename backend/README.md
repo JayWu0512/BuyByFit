@@ -53,7 +53,11 @@ gcloud auth application-default login     # once, locally; a service account on 
 uvicorn app.main:app --reload --port 8000
 ```
 
-Photos and renders are written to `backend/storage/rooms/` (gitignored) for now; `storage.py` is the only module
-to change when they move to a storage bucket. Models are set by `THREE_D_DESIGN_MODEL`, `THREE_D_FAST_MODEL` and
+Photos and renders are written to `backend/storage/rooms/` (gitignored) and, when `THREE_D_BUCKET` is set, also
+to `gs://$THREE_D_BUCKET/rooms/<room_id>/`. Cloud Run's disk is wiped on restart, so **set it in production**:
+otherwise old results 404. Files missing locally are read back from the bucket. Each run also saves
+`trace_<job>.json` (inputs, design, placements, every attempt's checks, errors) and the result page's
+"How does this look?" saves `feedback_<job>.json`: the data for the reviewer model. Neither is served over HTTP.
+Models are set by `THREE_D_DESIGN_MODEL`, `THREE_D_FAST_MODEL` and
 `THREE_D_IMAGE_MODEL` (defaults: gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-image).
 A run takes ~30-60 s; Vertex's per-minute quota on a new project can add retries (429) on top.

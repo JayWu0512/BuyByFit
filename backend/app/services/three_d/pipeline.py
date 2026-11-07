@@ -307,7 +307,32 @@ def _feedback(checks: list[dict], drift: float) -> str:
 
 # ---------------------------------------------------------------- whole run
 
+def _public(result: dict) -> dict:
+    """A placement without its numpy internals (for the trace)."""
+    return {k: v for k, v in result.items() if not k.startswith("_")}
+
+
 def run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage=lambda stage, info=None: None) -> dict:
+    """One restyle. Always leaves trace_<job>.json (inputs, design, placements, every attempt's checks, error)
+    next to the images: the training and eval data for the reviewer model."""
+    trace = {"job_id": job_id, "room_id": room_id, "brief": brief, "products": products,
+             "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "models": {"design": DESIGN_MODEL, "image": IMAGE_MODEL, "verify": FAST_MODEL}}
+    try:
+        summary = _run(room_id, job_id, brief, products, on_stage, trace)
+        trace["status"] = "done"
+        return summary
+    except Exception as error:
+        trace["status"], trace["error"] = "error", f"{type(error).__name__}: {error}"[:500]
+        raise
+    finally:
+        try:
+            storage.save(room_id, f"trace_{job_id}.json", json.dumps(trace, indent=1, default=str))
+        except Exception:  # the trace is a by-product; never let it break the run's own outcome
+            pass
+
+
+def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, trace: dict) -> dict:
     t_start = time.perf_counter()
     folder: Path = storage.room_dir(room_id)
     photo_bytes = (folder / "photo.jpg").read_bytes()
@@ -320,21 +345,25 @@ def run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage=la
     t = time.perf_counter()
     designed = design(photo_bytes, brief, products)
     timings["design"] = round(time.perf_counter() - t, 1)
+    trace["design"] = designed
     plan, zones = designed["plan"], {z["id"]: z for z in designed["analysis"]["free_floor_zones"]}
     by_ref = {f"p{i}": p for i, p in enumerate(products, 1)}
 
     # Place each pick at true size; if it doesn't fit, try another search result of the same category.
     on_stage("place", {"vibe": plan["vibe"]})
     items, placed, used = [], {}, set()
+    tried = trace.setdefault("placements", [])
     for pick in plan["picks"]:
         product, zone = by_ref.get(pick["product_ref"]), zones.get(pick["zone_id"])
         if product is None or zone is None:
+            tried.append({"pick": pick, "ok": False, "why": "unknown product_ref or zone_id"})
             continue
         same_kind = [p for p in products if p.get("category") == product.get("category") and p["id"] not in used]
         for candidate in [product, *[p for p in same_kind if p["id"] != product["id"]]][:4]:
             if candidate["id"] in used:
                 continue
             result = place(pick, candidate, zone, cam, placed)
+            tried.append({"pick": pick, "product_id": candidate["id"], **_public(result)})
             if result["ok"]:
                 used.add(candidate["id"])
                 placed[pick["id"]] = result
@@ -344,7 +373,7 @@ def run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage=la
         raise RuntimeError("None of these products fits the empty floor in this photo. Try a photo with more floor.")
 
     guide = guide_image(photo, items)
-    (folder / f"guide_{job_id}.jpg").write_bytes(guide)
+    storage.save(room_id, f"guide_{job_id}.jpg", guide)
     on_stage("render", {"guide_url": storage.file_url(room_id, f"guide_{job_id}.jpg")})
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -355,28 +384,32 @@ def run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage=la
         if img:
             refs.append(img)
 
-    attempts, feedback = [], ""
+    attempts, feedback, pngs = [], "", {}
+    trace["attempts"] = attempts
     for attempt in (1, 2):
         t = time.perf_counter()
         png = render(guide, items, refs, plan["tweaks"], plan["vibe"], _aspect(*photo.size), feedback)
         timings[f"render_{attempt}"] = round(time.perf_counter() - t, 1)
-        (folder / f"render_{job_id}_{attempt}.png").write_bytes(png)
+        pngs[attempt] = png
+        storage.save(room_id, f"render_{job_id}_{attempt}.png", png)
         on_stage("verify", {"attempt": attempt})
         checks = verify(png, items)
         drift = room_drift(photo, png, items)
-        attempts.append({"attempt": attempt, "checks": checks, "drift": drift, "score": round(_score(checks, drift), 3)})
+        attempts.append({"attempt": attempt, "checks": checks, "drift": drift, "score": round(_score(checks, drift), 3),
+                         "feedback_in": feedback})
         feedback = _feedback(checks, drift)
         if not feedback:
             break
     best = max(attempts, key=lambda a: a["score"])
-    (folder / f"render_{job_id}.png").write_bytes((folder / f"render_{job_id}_{best['attempt']}.png").read_bytes())
+    trace["best_attempt"] = best["attempt"]
+    storage.save(room_id, f"render_{job_id}.png", pngs[best["attempt"]])
 
     def card(p: dict) -> dict:
         return {"id": p["id"], "name": p["name"], "category": p.get("category"), "image_url": p.get("image_url"),
                 "product_url": p.get("product_url"), "size_cm": _size_cm(p)}
 
     summary = {
-        "room_id": room_id, "brief": brief, "vibe": plan["vibe"],
+        "room_id": room_id, "job_id": job_id, "brief": brief, "vibe": plan["vibe"],
         "photo_url": storage.file_url(room_id, "photo.jpg"),
         "guide_url": storage.file_url(room_id, f"guide_{job_id}.jpg"),
         "render_url": storage.file_url(room_id, f"render_{job_id}.png"),
@@ -394,6 +427,7 @@ def run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage=la
         "timings_s": {**timings, "total": round(time.perf_counter() - t_start, 1)},
         "attempts": [{k: a[k] for k in ("attempt", "drift", "score")} for a in attempts],
     }
-    (folder / f"summary_{job_id}.json").write_text(json.dumps(summary, indent=2))
+    trace["timings_s"] = summary["timings_s"]
+    storage.save(room_id, f"summary_{job_id}.json", json.dumps(summary, indent=2))
     on_stage("done")
     return summary

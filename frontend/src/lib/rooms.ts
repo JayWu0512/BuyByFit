@@ -19,6 +19,8 @@ export interface VisualizedProduct {
 }
 
 export interface VisualizationResult {
+  /** Missing on results saved in the tab before feedback existed. */
+  job_id?: string;
   vibe: string;
   photo_url: string;
   render_url: string;
@@ -83,6 +85,38 @@ export async function startVisualization(roomId: string, brief: string, products
     body: JSON.stringify({ brief, products: toVisualizationProducts(products) }),
   });
   return asJson<{ job_id: string }>(response);
+}
+
+/** What a person can flag on a restyle. Ids match `Issue` in backend/app/api/v1/rooms.py. */
+export const FEEDBACK_ISSUES = [
+  { id: "removed_existing", label: "Removed something I have" },
+  { id: "missing_piece", label: "Missing something I asked for" },
+  { id: "floating", label: "Furniture floating" },
+  { id: "wrong_size", label: "Wrong size" },
+  { id: "wrong_product", label: "Doesn't look like the product" },
+  { id: "wrong_orientation", label: "Facing the wrong way" },
+  { id: "blocks_path", label: "Blocks a door or walkway" },
+  { id: "room_changed", label: "Changed my walls or windows" },
+  { id: "artifacts", label: "Glitches or leftover boxes" },
+  { id: "off_brief", label: "Not the style I asked for" },
+  { id: "unrealistic", label: "Looks fake" },
+] as const;
+
+export type FeedbackIssue = (typeof FEEDBACK_ISSUES)[number]["id"];
+
+export interface VisualizationFeedback {
+  verdict: "good" | "bad";
+  issues: FeedbackIssue[];
+  note: string;
+}
+
+export async function sendFeedback(roomId: string, jobId: string, feedback: VisualizationFeedback) {
+  const response = await fetch(`/api/v1/rooms/${roomId}/visualizations/${jobId}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(feedback),
+  });
+  return asJson<{ ok: true }>(response);
 }
 
 export async function getVisualization(jobId: string): Promise<VisualizationJob> {
