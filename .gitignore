@@ -227,6 +227,9 @@ frontend/build/
 frontend/coverage/
 frontend/.env.local
 frontend/.env.*.local
+frontend/.agents/
+frontend/.taste-skill/
+frontend/.impeccable/config.local.json
 !frontend/src/lib/
 !frontend/src/lib/.gitkeep
 
@@ -258,4 +261,5 @@ redis-data/
 # OS and editor files
 .DS_Store
 .vscode/
+.impeccable/config.local.json
 .idea/
