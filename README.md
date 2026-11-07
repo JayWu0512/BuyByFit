@@ -41,7 +41,7 @@ One repository secret is required in **JayWu0512/BuyByFit**:
 
 `frontend/package.json` declares Node.js `>=20.9.0`, and `package-lock.json` is committed, so Vercel uses a reproducible dependency graph. No `vercel.json` is needed for this standard Next.js deployment.
 
-The deployed frontend's search endpoint is same-origin (`/api/v1/searches`). Configure the server-only Vercel variable `RECOMMENDATION_API_URL` with the separately deployed FastAPI service origin so the Next.js route can proxy recommendation requests. `localhost` only works on a developer machine and must never be used as the Production value.
+The deployed frontend's search endpoint is same-origin (`/api/v1/searches`) and works as a Vercel Serverless Function against the fictional MVP catalogue by default. For the future FastAPI recommendation service, configure server-only `RECOMMENDATION_API_URL` with its deployed origin; the route then proxies requests without changing frontend code. `localhost` only works on a developer machine and must never be used as the Production value.
 
 ## Repository layout
 

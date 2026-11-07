@@ -52,9 +52,9 @@ public/brand-mark.svg      BuyByFit browser icon and reusable mark
 
 ## Backend integration
 
-The search UI calls same-origin `POST /api/v1/searches`. The Next.js route at `src/app/api/v1/searches/route.ts` proxies this request server-side to `RECOMMENDATION_API_URL`, keeping the Python service URL and cross-origin access out of the browser.
+The search UI calls same-origin `POST /api/v1/searches`. The Next.js route at `src/app/api/v1/searches/route.ts` is a Vercel Serverless Function that ranks the local fictional catalogue for this MVP, so it works without a separate backend deployment.
 
-For local development, run the FastAPI service on port 8000 and copy `.env.example` to `.env.local`. For Vercel, deploy the Python recommendation service separately and set `RECOMMENDATION_API_URL` in the Vercel project environment variables for Production. Use the backend origin only, for example `https://buybyfit-api.example.com`—do not add `/api/v1/searches` and do not expose it through a `NEXT_PUBLIC_` variable.
+For a future Python/FastAPI recommendation service, deploy it separately and set server-only `RECOMMENDATION_API_URL` in local or Vercel environment variables. The same browser endpoint will then proxy requests to that backend without changing frontend code. Use only the backend origin, for example `https://buybyfit-api.example.com`—do not add `/api/v1/searches` and do not expose it through a `NEXT_PUBLIC_` variable.
 
 ## Deploy on Vercel
 

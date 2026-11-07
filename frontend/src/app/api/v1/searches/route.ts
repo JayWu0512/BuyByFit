@@ -1,9 +1,25 @@
 import { NextResponse } from "next/server";
 
+import { furnitureProducts } from "@/lib/mock-furniture";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const REQUEST_TIMEOUT_MS = 12_000;
+
+interface SearchFilters {
+  categories?: unknown;
+  colors?: unknown;
+  min_price?: unknown;
+  max_price?: unknown;
+  max_width_cm?: unknown;
+  max_depth_cm?: unknown;
+}
+
+interface SearchRequest {
+  filters?: SearchFilters;
+  style_description?: unknown;
+}
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: { message, status } }, { status });
@@ -14,25 +30,91 @@ function backendSearchUrl() {
   return baseUrl ? `${baseUrl}/api/v1/searches` : null;
 }
 
-/**
- * Same-origin browser endpoint for room-brief searches.
- *
- * The Python recommendation service stays behind this route: configure its
- * public deployment URL as RECOMMENDATION_API_URL in local/Vercel server env.
- */
-export async function POST(request: Request) {
-  const targetUrl = backendSearchUrl();
-  if (!targetUrl) {
-    return errorResponse("The recommendation service is not configured for this environment.", 503);
-  }
+function asStringList(value: unknown) {
+  const values = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+  return values.map((item) => String(item).trim().toLowerCase()).filter(Boolean);
+}
 
-  let requestBody: unknown;
-  try {
-    requestBody = await request.json();
-  } catch {
-    return errorResponse("Request body must be valid JSON.", 400);
-  }
+function asOptionalNumber(value: unknown) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
 
+function words(value: string) {
+  return new Set(value.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+}
+
+function productSearchText(product: (typeof furnitureProducts)[number]) {
+  return [product.name, product.brand, product.category, product.description, product.material, ...product.styles].join(" ").toLowerCase();
+}
+
+function productCard(product: (typeof furnitureProducts)[number], score: number) {
+  return {
+    id: product.id,
+    name: product.name,
+    brand: product.brand,
+    category: product.category,
+    price: product.price,
+    currency: product.currency,
+    image_url: product.imageUrl,
+    product_url: product.retailerUrl ?? null,
+    dimensions_cm: { width: product.widthCm, depth: product.depthCm, height: product.heightCm },
+    style_tags: product.styles,
+    match_score: score,
+    match_reason: "Matches the feeling and practical limits in your room brief.",
+  };
+}
+
+function localRecommendation(payload: SearchRequest) {
+  const description = typeof payload.style_description === "string" ? payload.style_description.trim() : "";
+  if (!description) return null;
+
+  const filters = payload.filters ?? {};
+  const queryWords = words(description);
+  const categories = asStringList(filters.categories);
+  const colors = asStringList(filters.colors);
+  const minPrice = asOptionalNumber(filters.min_price);
+  const maxPrice = asOptionalNumber(filters.max_price);
+  const maxWidth = asOptionalNumber(filters.max_width_cm);
+  const maxDepth = asOptionalNumber(filters.max_depth_cm);
+
+  const products = furnitureProducts
+    .filter((product) => {
+      const searchable = productSearchText(product);
+      return (
+        (categories.length === 0 || categories.includes(product.category.toLowerCase())) &&
+        (colors.length === 0 || colors.some((color) => searchable.includes(color))) &&
+        (minPrice === undefined || product.price === null || product.price >= minPrice) &&
+        (maxPrice === undefined || product.price === null || product.price <= maxPrice) &&
+        (maxWidth === undefined || product.widthCm <= maxWidth) &&
+        (maxDepth === undefined || product.depthCm <= maxDepth)
+      );
+    })
+    .map((product) => {
+      const searchableWords = words(productSearchText(product));
+      const matchedWords = [...queryWords].filter((word) => searchableWords.has(word)).length;
+      const score = Math.min(99, 54 + matchedWords * 9 + product.styles.filter((style) => queryWords.has(style.toLowerCase())).length * 8);
+      return { product, score };
+    })
+    .sort((a, b) => b.score - a.score || a.product.displayOrder - b.product.displayOrder)
+    .map(({ product, score }) => productCard(product, score));
+
+  return {
+    search: {
+      id: `search_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`,
+      created_at: new Date().toISOString(),
+      filters,
+      style_description: description,
+    },
+    results: {
+      search_id: "local-demo",
+      products,
+      pagination: { page: 1, per_page: 12, total: products.length, total_pages: 1 },
+    },
+  };
+}
+
+async function proxyToRecommendationService(targetUrl: string, requestBody: SearchRequest) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -58,4 +140,28 @@ export async function POST(request: Request) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Same-origin browser endpoint for room-brief searches.
+ *
+ * It runs a local Vercel Serverless recommendation for the MVP. Setting the
+ * server-only RECOMMENDATION_API_URL switches the same endpoint to a future
+ * Python/FastAPI recommendation service without changing client code.
+ */
+export async function POST(request: Request) {
+  let requestBody: SearchRequest;
+  try {
+    requestBody = (await request.json()) as SearchRequest;
+  } catch {
+    return errorResponse("Request body must be valid JSON.", 400);
+  }
+
+  const targetUrl = backendSearchUrl();
+  if (targetUrl) return proxyToRecommendationService(targetUrl, requestBody);
+
+  const result = localRecommendation(requestBody);
+  if (!result) return errorResponse("Tell us a little about the room before searching.", 400);
+
+  return NextResponse.json(result, { status: 201 });
 }
