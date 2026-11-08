@@ -216,6 +216,8 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
   const [active, setActive] = useState<number | null>(null);
   const [showMarkers, setShowMarkers] = useState(true);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [widthCm, setWidthCm] = useState("");
+  const [depthCm, setDepthCm] = useState("");
   const stageRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -340,8 +342,10 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
     setPhase("uploading");
     setResult(null);
     setJob(null);
+    const width = widthCm.trim() && Number.isFinite(Number(widthCm)) ? Number(widthCm) : null;
+    const depth = depthCm.trim() && Number.isFinite(Number(depthCm)) ? Number(depthCm) : null;
     try {
-      const room = await createRoom(photo, pitch);
+      const room = await createRoom(photo, pitch, width, depth);
       setRoomId(room.room_id);
       await visualize(room.room_id);
     } catch (err) {
@@ -422,6 +426,35 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
 
       {phase === "idle" || phase === "error" ? (
         <div className="room-visualizer-actions">
+          <div className="room-visualizer-dims">
+            <label>
+              <span>Room width (cm)</span>
+              <input
+                inputMode="numeric"
+                max={2000}
+                min={100}
+                onChange={(event) => setWidthCm(event.target.value)}
+                placeholder="e.g. 300"
+                type="number"
+                value={widthCm}
+              />
+            </label>
+            <label>
+              <span>Room depth (cm)</span>
+              <input
+                inputMode="numeric"
+                max={2000}
+                min={100}
+                onChange={(event) => setDepthCm(event.target.value)}
+                placeholder="e.g. 400"
+                type="number"
+                value={depthCm}
+              />
+            </label>
+          </div>
+          <p className="room-visualizer-hint">
+            Optional: type your room&apos;s real floor size for more accurate placement.
+          </p>
           <button className="button button-dark" onClick={openCamera} type="button">
             Take a photo
           </button>

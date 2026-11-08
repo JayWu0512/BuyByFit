@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024; // the page sends a ~1280 px JPEG, well under this
 
-/** POST /api/v1/rooms  (multipart: photo, optional pitch_deg)  ->  {room_id, scene, photo_url} */
+/** POST /api/v1/rooms  (multipart: photo, optional pitch_deg, room_width_cm, room_depth_cm)
+ *  ->  {room_id, scene, photo_url} */
 export async function POST(request: Request) {
   let form: FormData;
   try {
@@ -22,6 +23,12 @@ export async function POST(request: Request) {
   upstream.append("photo", photo, "room.jpg");
   const pitch = Number(form.get("pitch_deg"));
   if (form.get("pitch_deg") !== null && Number.isFinite(pitch)) upstream.append("pitch_deg", String(pitch));
+  const width = Number(form.get("room_width_cm"));
+  const depth = Number(form.get("room_depth_cm"));
+  if (form.get("room_width_cm") !== null && form.get("room_depth_cm") !== null && Number.isFinite(width) && Number.isFinite(depth)) {
+    upstream.append("room_width_cm", String(width));
+    upstream.append("room_depth_cm", String(depth));
+  }
 
   return forwardJson("/api/v1/rooms", { method: "POST", body: upstream }, 30_000);
 }
