@@ -444,6 +444,10 @@ h2 {
   line-height: 1.55;
 }
 
+.footer-message span {
+  display: block;
+}
+
 .footer-links {
   display: flex;
   flex-direction: column;
@@ -1438,10 +1442,6 @@ h2 {
 
   .footer-meta {
     gap: 1.5rem;
-    align-self: auto;
-  }
-
-  .footer-note {
     align-self: auto;
   }
 
