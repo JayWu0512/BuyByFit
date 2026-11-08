@@ -216,11 +216,6 @@ These products were already matched to the brief (reference | name | category | 
 
 1. Analyse the room. box_2d = [ymin, xmin, ymax, xmax] in 0-1000 image coordinates.
    free_floor_zones = visible empty floor areas where furniture could stand (the box covers the floor area).
-   For a large or structural piece this list might call for (a bed, sofa, or wardrobe), draw that zone as
-   the FULL floor space actually available along that wall, not a conservative patch around where you'd
-   casually sketch it. The true-size check afterward is what actually enforces whether a product fits --
-   if you draw the zone too small, a real-size bed or sofa gets rejected as "too big" even when the room
-   genuinely has the floor space for it.
 2. Pick at most {MAX_PICKS} products FROM THIS LIST that together best restyle the room toward the brief
    (complementary pieces: e.g. a desk and a chair, or a sofa, a rug and a lamp; not two of the same kind).
    Each stands on one free_floor_zone and must physically fit there at its real size.
