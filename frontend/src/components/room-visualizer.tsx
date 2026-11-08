@@ -84,6 +84,22 @@ function saveRoom(saved: SavedRoom | null) {
 
 const feedbackKey = (jobId: string) => `buybyfit-feedback-${jobId}`;
 
+function ThumbsUpIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+      <path d="M7.5 21H5.4A2.4 2.4 0 0 1 3 18.6v-6.2A2.4 2.4 0 0 1 5.4 10h2.1m0 11V10l3.4-6.1A2.2 2.2 0 0 1 15 5v4.3h3.4c1.5 0 2.6 1.4 2.3 2.9l-1.3 6.7A2.5 2.5 0 0 1 17 21H7.5Z" />
+    </svg>
+  );
+}
+
+function ThumbsDownIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+      <path d="M7.5 3H5.4A2.4 2.4 0 0 0 3 5.4v6.2A2.4 2.4 0 0 0 5.4 14h2.1m0-11v11l3.4 6.1A2.2 2.2 0 0 0 15 19v-4.3h3.4c1.5 0 2.6-1.4 2.3-2.9l-1.3-6.7A2.5 2.5 0 0 0 17 3H7.5Z" />
+    </svg>
+  );
+}
+
 /** "How does this look?": a person's verdict on one restyle. These labels train the reviewer model. */
 function RestyleFeedback({ roomId, jobId }: { roomId: string; jobId: string }) {
   // Only rendered after a result exists (client side), so reading session storage here is safe.
@@ -133,11 +149,25 @@ function RestyleFeedback({ roomId, jobId }: { roomId: string; jobId: string }) {
       {state === "ask" ? (
         <div className="rv-feedback-ask">
           <p>How does this look?</p>
-          <button className="button rv-light" disabled={sending} onClick={() => submit("good")} type="button">
-            {sending ? "Sending…" : "Looks right"}
+          <button
+            aria-label="Looks right"
+            className="rv-feedback-vote"
+            disabled={sending}
+            onClick={() => submit("good")}
+            title="Looks right"
+            type="button"
+          >
+            <ThumbsUpIcon />
           </button>
-          <button className="button rv-light" disabled={sending} onClick={() => setState("issues")} type="button">
-            Something&apos;s off
+          <button
+            aria-label="Something's off"
+            className="rv-feedback-vote"
+            disabled={sending}
+            onClick={() => setState("issues")}
+            title="Something's off"
+            type="button"
+          >
+            <ThumbsDownIcon />
           </button>
         </div>
       ) : (

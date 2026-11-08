@@ -2009,7 +2009,7 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.35rem;
 }
 
 .rv-feedback-ask p {
@@ -2018,10 +2018,40 @@ h2 {
   font-size: 1.05rem;
 }
 
-.rv-feedback-ask .button {
-  min-height: 40px;
-  padding: 0.6rem 1rem;
-  border: 1px solid var(--line);
+.rv-feedback-vote {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--soft-ink);
+  background: transparent;
+  transition: color 150ms ease, transform 150ms ease;
+}
+
+.rv-feedback-vote svg {
+  width: 25px;
+  height: 25px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.rv-feedback-vote:hover:not(:disabled) {
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+
+.rv-feedback-vote:active:not(:disabled) {
+  transform: translateY(0) scale(0.92);
+}
+
+.rv-feedback-vote:disabled {
+  cursor: wait;
+  opacity: 0.45;
 }
 
 .rv-feedback-issues {
