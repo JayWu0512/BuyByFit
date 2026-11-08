@@ -445,8 +445,11 @@ Images 2 to {1 + len(refs)} are product photos.
 Return Image 1 as a real photograph restyled toward "{vibe}":
 1. Furniture (MOST IMPORTANT, exact size): place each product standing on the floor inside its red rectangle.
    Its outer edges touch the rectangle's left, right and top sides and its feet stand on the bottom side.
-   Nothing goes outside its rectangle. Each product must look EXACTLY like its product photo: same shape,
-   same legs, same colours and materials (the product photo wins over the room's style). A rug lies flat on the floor.
+   Nothing goes outside its rectangle. Each product must match its product photo's shape, legs, colours and
+   materials (the product photo wins over the room's style) -- but shown in its normal, everyday resting
+   state, not a packaging or demo pose: a storage bed's lift mechanism closed and made up with a mattress
+   and bedding, a reclining chair upright, a drawer or door shut, a folded item unfolded for use. A rug lies
+   flat on the floor.
 {lines}
 {swaps}   The user's other furniture stays exactly where and as it is{keep}: never remove, move or replace it.
 2. Styling tweaks (make them clearly visible but believable, as a designer really would do them;

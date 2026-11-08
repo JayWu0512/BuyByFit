@@ -62,6 +62,7 @@ function clearSearchState() {
 
 export function DiscoverView() {
   const [brief, setBrief] = useState("");
+  const [maxBudget, setMaxBudget] = useState("");
   const [submittedBrief, setSubmittedBrief] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -121,8 +122,9 @@ export function DiscoverView() {
 
     setError("");
     setIsSearching(true);
+    const budget = maxBudget.trim() && Number.isFinite(Number(maxBudget)) ? Number(maxBudget) : undefined;
     try {
-      const products = await searchFurniture(trimmedBrief);
+      const products = await searchFurniture(trimmedBrief, budget);
       setSearchResults(products);
       saveSearchState(trimmedBrief, products);
       setSubmittedBrief(trimmedBrief);
@@ -259,6 +261,19 @@ export function DiscoverView() {
                   {error}
                 </p>
               ) : null}
+
+              <label className="budget-control" htmlFor="room-budget">
+                <span>Max budget ($)</span>
+                <input
+                  id="room-budget"
+                  inputMode="numeric"
+                  min={0}
+                  onChange={(event) => setMaxBudget(event.target.value)}
+                  placeholder="No limit"
+                  type="number"
+                  value={maxBudget}
+                />
+              </label>
 
               <div className="prompt-actions">
                 <button className="button button-dark" disabled={isSearching} type="submit">
