@@ -70,9 +70,13 @@ export function DiscoverView() {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<FurnitureProduct[]>([]);
+  const [showCatalogNote, setShowCatalogNote] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const catalogPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const catalogDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const catalogLongPressRef = useRef(false);
   const results = searchResults;
 
   useEffect(() => {
@@ -140,6 +144,24 @@ export function DiscoverView() {
     setSubmittedBrief(null);
     setSearchResults([]);
     window.setTimeout(() => promptRef.current?.focus(), 0);
+  };
+
+  const clearCatalogPress = () => {
+    if (catalogPressTimerRef.current) {
+      clearTimeout(catalogPressTimerRef.current);
+      catalogPressTimerRef.current = null;
+    }
+  };
+
+  const beginCatalogPress = () => {
+    clearCatalogPress();
+    catalogLongPressRef.current = false;
+    catalogPressTimerRef.current = setTimeout(() => {
+      catalogLongPressRef.current = true;
+      setShowCatalogNote(true);
+      if (catalogDismissTimerRef.current) clearTimeout(catalogDismissTimerRef.current);
+      catalogDismissTimerRef.current = setTimeout(() => setShowCatalogNote(false), 5000);
+    }, 600);
   };
 
   const toggleVoiceInput = () => {
@@ -275,10 +297,28 @@ export function DiscoverView() {
               </label>
 
               <div className="prompt-actions">
-                <button className="button button-dark" disabled={isSearching} type="submit">
+                <button
+                  aria-label="Find pieces. Press and hold for catalogue details."
+                  className="button button-dark"
+                  disabled={isSearching}
+                  onClick={(event) => {
+                    if (!catalogLongPressRef.current) return;
+                    event.preventDefault();
+                    catalogLongPressRef.current = false;
+                  }}
+                  onPointerCancel={clearCatalogPress}
+                  onPointerDown={beginCatalogPress}
+                  onPointerLeave={clearCatalogPress}
+                  onPointerUp={clearCatalogPress}
+                  type="submit"
+                >
                   {isSearching ? "Searching…" : "Find pieces"}
                 </button>
-                <p>Results are ranked live by our recommendation service against a real (small, work-in-progress) product catalog.</p>
+                {showCatalogNote ? (
+                  <p className="search-catalog-note" role="status">
+                    Results are ranked live by our recommendation service against a real product catalog.
+                  </p>
+                ) : null}
               </div>
             </form>
 
@@ -358,10 +398,6 @@ export function DiscoverView() {
               </button>
             </div>
           </div>
-
-          <p className="result-count" aria-live="polite">
-            {results.length > 0 ? `${results.length} pieces found` : "No matches yet"}
-          </p>
 
           {results.length > 0 ? <RoomVisualizer brief={submittedBrief} products={searchResults} /> : null}
 

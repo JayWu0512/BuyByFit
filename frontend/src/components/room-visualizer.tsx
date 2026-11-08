@@ -486,10 +486,10 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
           <p className="room-visualizer-hint">
             Optional: type your room&apos;s real floor size for more accurate placement.
           </p>
-          <button className="button button-dark" onClick={openCamera} type="button">
+          <button className="button button-dark room-photo-choice" onClick={openCamera} type="button">
             Take a photo
           </button>
-          <button className="button" onClick={() => fileRef.current?.click()} type="button">
+          <button className="button room-photo-choice" onClick={() => fileRef.current?.click()} type="button">
             Upload a photo
           </button>
           <input accept="image/*" hidden onChange={onFile} ref={fileRef} type="file" />

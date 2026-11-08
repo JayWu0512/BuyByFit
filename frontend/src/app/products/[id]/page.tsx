@@ -85,11 +85,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
             ) : null}
 
             {product.retailerUrl ? (
-              <a className="button button-dark" href={product.retailerUrl} rel="noopener noreferrer" target="_blank">
+              <a className="button button-dark product-purchase-button" href={product.retailerUrl} rel="noopener noreferrer" target="_blank">
                 Buy it
               </a>
             ) : (
-              <button aria-label="Buy it is unavailable for this fictional sample" className="button button-unavailable" disabled type="button">
+              <button aria-label="Buy it is unavailable for this fictional sample" className="button button-unavailable product-purchase-button" disabled type="button">
                 Buy it
               </button>
             )}

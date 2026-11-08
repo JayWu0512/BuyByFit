@@ -83,7 +83,7 @@ export default function HomePage() {
           <div>
             <h2 id="closing-heading">Let the room decide.</h2>
           </div>
-          <p>Describe your space, then browse 16 clearly fictional furniture samples while the recommendation model is still in demo mode.</p>
+          <p>Describe your space, then discover furniture selected for the way you want to live.</p>
           <Link className="button button-timber" href="/discover">
             Find your fit
           </Link>
