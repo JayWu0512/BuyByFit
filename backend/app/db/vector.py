@@ -39,6 +39,7 @@ _SIMILARITY_QUERY = text(
         p.est_price,
         p.est_price_low,
         p.est_price_high,
+        p.est_price_basis,
         p.url,
         p.image_urls,
         p.model_3d_url,

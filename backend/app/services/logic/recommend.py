@@ -87,13 +87,15 @@ def _product_card(product: dict[str, Any]) -> dict[str, Any]:
         "category": (product.get("product_type") or "").lower() or None,
         "price": product.get("price"),
         "currency": product.get("currency"),
-        "est_price": product.get("est_price"),
-        "est_price_range": (
-            {"low": product.get("est_price_low"), "high": product.get("est_price_high")}
-            if product.get("est_price_low") is not None and product.get("est_price_high") is not None
+        # Matches ApiProductCard.price_estimate in the frontend (also built independently for its
+        # Supabase-fallback search path) -- same shape, so whichever backend answers, the UI reads one field.
+        "price_estimate": (
+            {"low": product.get("est_price_low"), "high": product.get("est_price_high"),
+             "basis": product.get("est_price_basis")}
+            if product.get("price") is None
+            and product.get("est_price_low") is not None and product.get("est_price_high") is not None
             else None
         ),
-        "price_is_estimated": product.get("price") is None and product.get("est_price") is not None,
         "image_url": image_urls[0] if image_urls else None,
         "image_urls": image_urls,
         "product_url": product.get("url"),
