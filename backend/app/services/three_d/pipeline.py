@@ -26,6 +26,7 @@ import json
 import logging
 import math
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -38,13 +39,15 @@ from PIL import Image, ImageDraw, ImageFont
 from . import reviewer, storage
 from .scene import Camera
 from .schemas import Design, Detection, Extras, RoomContext
-from .vertex import generate, generate_json
+from .vertex import RateLimited, generate, generate_json
 
 log = logging.getLogger(__name__)
 
 DESIGN_MODEL = os.environ.get("THREE_D_DESIGN_MODEL", "gemini-3.1-pro-preview")
 FAST_MODEL = os.environ.get("THREE_D_FAST_MODEL", "gemini-3-flash-preview")
 IMAGE_MODEL = os.environ.get("THREE_D_IMAGE_MODEL", "gemini-3.1-flash-image")
+# Different capacity pool: used only when IMAGE_MODEL stays rate-limited (slower, sizes a bit looser).
+FALLBACK_IMAGE_MODEL = os.environ.get("THREE_D_FALLBACK_IMAGE_MODEL", "gemini-3-pro-image")
 MAX_PICKS = 4
 DRIFT_LIMIT = 30.0  # mean colour change outside the products; above this the AI redrew the room
 CONTEXT_TIMEOUT_S = 30.0  # bounds products_for_room(); see its docstring for why this matters
@@ -61,6 +64,24 @@ def _size_cm(p: dict) -> str:
 
 def _is_rug(p: dict) -> bool:
     return "rug" in (p.get("category") or "").lower()
+
+
+def _on_existing(box: list[float], existing: list[dict], limit: float = 0.4) -> str | None:
+    """Label of a piece of the user's furniture this placement would stand on, else None.
+    Compares floor-contact strips (bottom of each box), not whole boxes: in a photo a chair in front of a bed
+    overlaps it on screen without touching it, but two pieces whose bottoms overlap stand in the same spot."""
+    y0, x0, y1, x1 = box
+    ay0 = y1 - (y1 - y0) * 0.25
+    a_area = max(1e-6, (y1 - ay0) * (x1 - x0))
+    for e in existing:
+        if len(e.get("box_2d") or []) != 4:
+            continue
+        ey0, ex0, ey1, ex1 = e["box_2d"]
+        by0 = ey1 - (ey1 - ey0) * 0.3
+        inter = max(0.0, min(y1, ey1) - max(ay0, by0)) * max(0.0, min(x1, ex1) - max(x0, ex0))
+        if inter / a_area > limit:
+            return e.get("label") or "furniture"
+    return None
 
 
 def fetch_product_image(url: str | None) -> bytes | None:
@@ -130,6 +151,18 @@ def products_for_room(photo: bytes, brief: str, fallback_products: list[dict]) -
     return (products or fallback_products), needs
 
 
+def _to_room_product(p: dict) -> dict | None:
+    """A recommend() card trimmed to what pipeline.py needs, or None if it has no usable dimensions."""
+    dims = p["dimensions_cm"]
+    if not (dims["width"] and dims["depth"] and dims["height"]):
+        return None
+    return {
+        "id": p["id"], "name": p["name"], "category": p.get("category"),
+        "width_cm": dims["width"], "depth_cm": dims["depth"], "height_cm": dims["height"],
+        "image_url": p.get("image_url"), "product_url": p.get("product_url"),
+    }
+
+
 def _search_for_room(photo: bytes, brief: str) -> tuple[list[dict], list[str]]:
     context = quick_room_context(photo, brief)
     needs = context["needs"]
@@ -139,22 +172,24 @@ def _search_for_room(photo: bytes, brief: str) -> tuple[list[dict], list[str]]:
     )
     from app.services.logic.recommend import recommend  # same deployment, in-process call
 
-    candidates = recommend(enriched_brief, {}, limit=24)
+    products = [p for c in recommend(enriched_brief, {}, limit=24) if (p := _to_room_product(c))]
 
-    products = [
-        {
-            "id": p["id"],
-            "name": p["name"],
-            "category": p.get("category"),
-            "width_cm": p["dimensions_cm"]["width"],
-            "depth_cm": p["dimensions_cm"]["depth"],
-            "height_cm": p["dimensions_cm"]["height"],
-            "image_url": p.get("image_url"),
-            "product_url": p.get("product_url"),
-        }
-        for p in candidates
-        if p["dimensions_cm"]["width"] and p["dimensions_cm"]["depth"] and p["dimensions_cm"]["height"]
-    ]
+    # Pure style-similarity search can crowd a needed category out entirely when every option in it is a
+    # poor style match (seen in practice: an "oak tones" brief ranked oak-toned nightstands above every
+    # bed, none of which happen to be oak-colored in the catalog) -- design()'s needs_hint can only force a
+    # pick that's actually in this list, so for the most critical needs, search the need alone (ranked by
+    # category relevance, not competing against the full style query) and add a few options if nothing
+    # already covers it. These are appended, not prepended: a real style match should still win the pick.
+    seen_ids = {p["id"] for p in products}
+    for need in needs[:2]:
+        if _need_covered(need, products):
+            continue
+        for c in recommend(need, {}, limit=3):
+            extra = _to_room_product(c)
+            if extra and extra["id"] not in seen_ids:
+                products.append(extra)
+                seen_ids.add(extra["id"])
+
     return products, needs
 
 
@@ -165,18 +200,36 @@ _FURNITURE_WORDS = (
     "wardrobe", "armoire", "cabinet", "bookshelf", "bookcase", "nightstand", "night stand", "ottoman",
     "bench", "shelving", "shelf", "console",
 )
+# Word-boundary, not substring: a plain `"bed" in text` match also fires on "bedside", "bedding",
+# "bedroom" -- all real strings that show up in product names and need text (seen in practice: a
+# "Bedside Cabinet/Nightstand" product falsely counted as covering a "bed" need).
+_FURNITURE_WORD_RE = re.compile(r"\b(?:" + "|".join(re.escape(w) for w in _FURNITURE_WORDS) + r")\b")
 
 
 def _mentions_furniture(instruction: str) -> bool:
     """A tweak is meant to be non-furniture (see design()'s prompt); this is the Python-side backstop
     for when the model names a furniture item in one anyway, which render() would otherwise draw into
     the image with no real product behind it."""
-    lowered = instruction.lower()
-    return any(word in lowered for word in _FURNITURE_WORDS)
+    return bool(_FURNITURE_WORD_RE.search(instruction.lower()))
+
+
+def _need_covered(need: str, items: list[dict]) -> bool:
+    """Whether `need` (free text like "bed frame and mattress") is represented by name or category in
+    `items` (either the design's picks or the full candidate list). Only checks the furniture nouns in
+    _FURNITURE_WORDS -- a need like "more natural light" or "window treatments" has no product category to
+    match against, so there's nothing to deterministically enforce for it; treated as trivially covered."""
+    need_words = set(_FURNITURE_WORD_RE.findall(need.lower()))
+    if not need_words:
+        return True
+    # DB categories come through as e.g. "bed_frame" (see recommend.py's _product_card); regex \b treats
+    # "_" as a word character, so \bbed\b would never match inside it without this replace.
+    item_words = (set(_FURNITURE_WORD_RE.findall(f"{it.get('name', '')} {it.get('category', '')}".replace("_", " ").lower()))
+                 for it in items)
+    return any(need_words & words for words in item_words)
 
 
 def design(photo: bytes, brief: str, products: list[dict], needs: list[str] | None = None,
-           room_cm: dict | None = None) -> dict:
+           room_cm: dict | None = None, feedback: str = "", expert_notes: list[str] | None = None) -> dict:
     listing = "\n".join(f"p{i} | {p['name'][:90]} | {p.get('category') or 'furniture'} | {_size_cm(p)} (W x D x H)"
                         for i, p in enumerate(products, 1))
     room_size_hint = ""
@@ -198,20 +251,32 @@ def design(photo: bytes, brief: str, products: list[dict], needs: list[str] | No
         "list actually gets placed and rendered, so a bed mentioned only as a tweak means no bed appears.\n"
         if needs else ""
     )
+    expert_hint = (
+        "\nOur senior interior design expert reviewed this room's current style:\n"
+        + "\n".join(f"  - {n}" for n in expert_notes)
+        + "\nLet these notes guide the vibe, which pieces you replace, and the styling tweaks.\n"
+        if expert_notes else ""
+    )
     return generate_json(DESIGN_MODEL, [photo, f"""You are an interior designer looking at a phone photo of a room.
-The user's brief: "{brief}".{room_size_hint}{needs_hint}
+The user's brief: "{brief}".{room_size_hint}{needs_hint}{expert_hint}
 These products were already matched to the brief (reference | name | category | real size):
 {listing}
 
 1. Analyse the room. box_2d = [ymin, xmin, ymax, xmax] in 0-1000 image coordinates.
-   free_floor_zones = visible empty floor areas where furniture could stand (the box covers the floor area).
-   For a large or structural piece this list might call for (a bed, sofa, or wardrobe), draw that zone as
-   the FULL floor space actually available along that wall, not a conservative patch around where you'd
-   casually sketch it. The true-size check afterward is what actually enforces whether a product fits --
-   if you draw the zone too small, a real-size bed or sofa gets rejected as "too big" even when the room
-   genuinely has the floor space for it.
+   existing = EVERY piece of furniture already in the photo (bed, sofa, table, chairs, desk, cabinet, bench...).
+   Restyling may REPLACE some of them: if a product from the list would serve the brief better than an existing
+   piece (e.g. a sculptural round table instead of a plain dining table), replace it -- set that piece's
+   keep=false and put its exact label in the replacing pick's "replaces". Only replace with a pick of the same
+   function (a table for a table, a sofa for a futon, a bed for a bed); never just remove the user's furniture.
+   Every other piece keeps keep=true and stays exactly where and as it is.
+   free_floor_zones = floor areas where a new piece could stand (the box covers the floor area): EMPTY floor,
+   or the floor of a piece being replaced (keep=false). Never floor that a kept piece stands on.
 2. Pick at most {MAX_PICKS} products FROM THIS LIST that together best restyle the room toward the brief
    (complementary pieces: e.g. a desk and a chair, or a sofa, a rug and a lamp; not two of the same kind).
+   Be a bold designer: the user wants to SEE their room transformed, not a token change. Aim for 2 to
+   {MAX_PICKS} picks (never more than {MAX_PICKS}), additions and replacements together: replace the existing
+   pieces that clash most with the brief when the list has a same-function product for them (a dated table, a
+   mismatched dresser, a worn rug), and keep the rest.
    Each stands on one free_floor_zone and must physically fit there at its real size.
    layout says how it stands:
      "against_wall"   its back to the wall/window at the far side of the zone (desks, sofas, shelves)
@@ -225,7 +290,8 @@ These products were already matched to the brief (reference | name | category | 
    declutter). A tweak must never describe a piece of furniture (no beds, tables, chairs, lamps, rugs,
    shelves, etc.) -- if you want a furniture item in the room, it belongs in picks, above, as an actual
    product reference, not as tweak text. Tweaks only ever get an instruction in words; nothing in a tweak
-   is placed, sized, or guaranteed to appear in the final image."""], schema=Design)
+   is placed, sized, or guaranteed to appear in the final image.
+{feedback}"""], schema=Design)
 
 
 # ---------------------------------------------------------------- placement (true size)
@@ -348,6 +414,8 @@ def guide_image(photo: Image.Image, items: list[dict]) -> bytes:
         font = ImageFont.load_default()
     for n, it in enumerate(items, 1):
         y0, x0, y1, x1 = it["box"]
+        if x1 <= x0 or y1 <= y0:  # a piece projected off the photo: nothing to draw (PIL raises on it)
+            continue
         dr.rectangle([x0 * W / 1000, y0 * H / 1000, x1 * W / 1000, y1 * H / 1000], outline=(255, 0, 0), width=max(4, W // 200))
         dr.text((x0 * W / 1000 + 6, y0 * H / 1000 + 4), str(n), fill=(255, 0, 0), font=font)
     buf = io.BytesIO()
@@ -361,11 +429,17 @@ def _aspect(w: int, h: int) -> str:
 
 
 def render(guide: bytes, items: list[dict], refs: list[bytes], tweaks: list[dict], vibe: str, aspect: str,
-           feedback: str = "") -> bytes:
+           feedback: str = "", existing: list[str] | None = None) -> bytes:
     lines = "\n".join(f"  box {n}: {it['product']['name'][:80]} ({_size_cm(it['product'])})"
                       + (f"; product photo = image {it['ref_index'] + 2}" if it.get("ref_index") is not None else "")
                       for n, it in enumerate(items, 1))
     tw = "\n".join(f"  - {t['type']}: {t['instruction']}" for t in tweaks) or "  - none"
+    keep = f" ({', '.join(existing)})" if existing else ""
+    # Replacing the user's furniture happens only explicitly: say what goes, so the image model never "makes
+    # room" by deleting a piece on its own.
+    swaps = "".join(f"   Box {n} REPLACES the room's {it['pick']['replaces']}: remove that piece completely and put "
+                    f"product {n} where it stood.\n"
+                    for n, it in enumerate(items, 1) if (it.get("pick") or {}).get("replaces"))
     prompt = f"""Image 1 is a real phone photo of a room with numbered red rectangles drawn on it.
 Images 2 to {1 + len(refs)} are product photos.
 Return Image 1 as a real photograph restyled toward "{vibe}":
@@ -374,7 +448,9 @@ Return Image 1 as a real photograph restyled toward "{vibe}":
    Nothing goes outside its rectangle. Each product must look EXACTLY like its product photo: same shape,
    same legs, same colours and materials (the product photo wins over the room's style). A rug lies flat on the floor.
 {lines}
-2. Styling tweaks (subtle, keep it believable):
+{swaps}   The user's other furniture stays exactly where and as it is{keep}: never remove, move or replace it.
+2. Styling tweaks (make them clearly visible but believable, as a designer really would do them;
+   never remove furniture):
 {tw}
 3. Keep the room's architecture, windows, walls, floor and camera framing exactly the same.
    Match light direction, white balance and phone-camera noise; add soft contact shadows.
@@ -383,7 +459,15 @@ Return Image 1 as a real photograph restyled toward "{vibe}":
    or a styling tweak doesn't fully furnish it. Every piece you draw must be something the user can actually
    buy from this plan; inventing one they can't is worse than leaving the room looking unfinished.
 {feedback}"""
-    return generate(IMAGE_MODEL, [guide, *refs, prompt], image_out=True, aspect=aspect)
+    parts = [guide, *refs, prompt]
+    try:
+        return generate(IMAGE_MODEL, parts, image_out=True, aspect=aspect, retries=6)
+    except RateLimited:
+        # The shared pool for IMAGE_MODEL stayed busy (~20 s of 2-4 s retries): another model has its own pool.
+        if not FALLBACK_IMAGE_MODEL or FALLBACK_IMAGE_MODEL == IMAGE_MODEL:
+            raise
+        log.warning("%s still rate-limited; rendering this attempt with %s", IMAGE_MODEL, FALLBACK_IMAGE_MODEL)
+        return generate(FALLBACK_IMAGE_MODEL, parts, image_out=True, aspect=aspect, retries=6)
 
 
 def _iou(a, b):
@@ -417,23 +501,31 @@ box_2d tight around the whole piece of furniture (legs included), 0-1000 coordin
     return out
 
 
-def find_extras(render_png: bytes, items: list[dict], tweaks: list[dict]) -> list[str]:
+def find_extras(photo: bytes, render_png: bytes, items: list[dict], tweaks: list[dict]) -> list[str]:
     """Image models are unreliable at negative instructions ("don't add X") -- render()'s prompt already
     tells it not to invent furniture, but that alone isn't enough to stop it (seen in practice: a rug drawn
     in with no product or tweak behind it). This checks the actual pixels afterward instead of just trusting
-    the prompt, so a hallucinated, unpurchasable piece can be caught and penalised like a missing one is."""
+    the prompt, so a hallucinated, unpurchasable piece can be caught and penalised like a missing one is.
+
+    Compares against the ORIGINAL photo, not just the numbered products -- a real, already-furnished room
+    (an existing bed, posters, a guitar on the wall) gets faithfully carried over into the restyle per
+    render()'s own "keep the room... exactly the same" instruction, and that is correct, not a hallucination.
+    Flagging anything furniture-shaped in the render, pre-existing or not, falsely tanked the score of every
+    attempt on a furnished room (seen in practice: real bedroom items scored as if invented from nothing)."""
     names = "\n".join(f"{n}. {it['product']['name'][:80]}" for n, it in enumerate(items, 1))
     approved = "\n".join(f"  - {t['instruction']}" for t in tweaks) or "  - none"
-    found = generate_json(FAST_MODEL, [render_png, f"""This room should contain exactly these numbered products,
-and nothing else new:
+    found = generate_json(FAST_MODEL, [photo, render_png, f"""Image 1 is the room's original photo, before any
+restyling. Image 2 is it restyled toward the brief. The restyle should contain exactly these numbered
+products, and nothing else NEW:
 {names}
 
 These approved styling touches are also expected (not products, but intentional -- don't flag them):
 {approved}
 
-List any OTHER furniture, rug, lamp, plant, or large decor visible that isn't one of the numbered products
-and isn't explained by an approved styling touch above. Ignore the room's own pre-existing fixtures (windows,
-built-in lighting already in the original photo, trim). Empty list if there's nothing extra."""],
+List any OTHER furniture, rug, lamp, plant, or large decor visible in Image 2 that is NOT one of the
+numbered products, is NOT explained by an approved styling touch above, AND does not already appear
+somewhere in Image 1 -- i.e. something genuinely new that the restyle invented, not something that was
+simply already in the room and got carried over. Empty list if there's nothing genuinely new and extra."""],
                           schema=Extras, thinking="minimal")
     return [e["description"] for e in found["extras"]]
 
@@ -509,16 +601,41 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
 
     on_stage("context")
     t = time.perf_counter()
-    products, needs = products_for_room(photo_bytes, brief, products)
+    # Our fine-tuned design expert critiques the room's current style while the product search runs; its notes
+    # brief the designer below. [] when it isn't configured or fails, and then the design runs as before.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        f_notes = pool.submit(reviewer.room_notes, photo_bytes)
+        products, needs = products_for_room(photo_bytes, brief, products)
+        expert_notes = f_notes.result()
     timings["context"] = round(time.perf_counter() - t, 1)
+    trace["expert_notes"] = expert_notes
 
     on_stage("design")
     t = time.perf_counter()
-    designed = design(photo_bytes, brief, products, needs, room_cm)
-    timings["design"] = round(time.perf_counter() - t, 1)
-    trace["design"] = designed
+    designed = design(photo_bytes, brief, products, needs, room_cm, expert_notes=expert_notes)
     plan, zones = designed["plan"], {z["id"]: z for z in designed["analysis"]["free_floor_zones"]}
     by_ref = {f"p{i}": p for i, p in enumerate(products, 1)}
+    # Backstop for the needs_hint instruction above ("you MUST include a pick for the #1 need"): the prompt
+    # reduces this, but can't guarantee it -- seen in practice: 24 real candidates including a bed, and the
+    # model still only picked a nightstand and a dresser. One retry with explicit feedback, same pattern as
+    # render()'s attempt loop, rather than silently shipping a bedroom with no bed.
+    top_need = needs[0] if needs else None
+    if top_need and _need_covered(top_need, products) \
+            and not _need_covered(top_need, [by_ref[p["product_ref"]] for p in plan["picks"] if p["product_ref"] in by_ref]):
+        log.warning("job %s: design dropped the #1 need (%r) despite a matching candidate; retrying design once",
+                    job_id, top_need)
+        designed = design(photo_bytes, brief, products, needs, room_cm, expert_notes=expert_notes,
+                          feedback=f'You didn\'t include a pick for the room\'s #1 need, "{top_need}", even '
+                                   "though a matching product is in the list above. Add it as a real pick "
+                                   "this time -- a styling tweak doesn't count.")
+        plan, zones = designed["plan"], {z["id"]: z for z in designed["analysis"]["free_floor_zones"]}
+        if not _need_covered(top_need, [by_ref[p["product_ref"]] for p in plan["picks"] if p["product_ref"] in by_ref]):
+            log.warning("job %s: design still didn't include the #1 need (%r) after a retry", job_id, top_need)
+    timings["design"] = round(time.perf_counter() - t, 1)
+    trace["design"] = designed
+    # The user's furniture the plan keeps: it stays, and new pieces may not stand on it (see _on_existing).
+    # A piece the plan replaces (keep=false, named in a pick's "replaces") makes room for that pick.
+    existing = [e for e in designed["analysis"].get("existing") or [] if e.get("keep", True)]
     # Backup for the prompt instruction above (tweaks must not describe furniture): the prompt reduces
     # this, but can't guarantee it. A furniture-sounding tweak reaching render() gets drawn into the image
     # with no product behind it -- unlinked, unpriced, not really recommended -- which is worse than just
@@ -548,6 +665,10 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
             if candidate["id"] in used:
                 continue
             result = place(pick, candidate, zone, cam, placed, room_cm)
+            if result["ok"] and not result.get("_flat"):
+                blocked_by = _on_existing(result["box"], existing)
+                if blocked_by:
+                    result = {"ok": False, "why": f"would stand on the user's {blocked_by}"}
             tried_trace.append({"pick": pick, "product_id": candidate["id"], **_public(result)})
             tried.append({"id": candidate["id"], "name": candidate["name"], "ok": result["ok"],
                           "why": result.get("why")})
@@ -580,14 +701,15 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
     trace["attempts"] = attempts
     for attempt in (1, 2):
         t = time.perf_counter()
-        png = render(guide, items, refs, plan["tweaks"], plan["vibe"], _aspect(*photo.size), feedback)
+        png = render(guide, items, refs, plan["tweaks"], plan["vibe"], _aspect(*photo.size), feedback,
+                     [e["label"] for e in existing])
         timings[f"render_{attempt}"] = round(time.perf_counter() - t, 1)
         pngs[attempt] = png
         storage.save(room_id, f"render_{job_id}_{attempt}.png", png)
         on_stage("verify", {"attempt": attempt})
         checks = verify(png, items)
         drift = room_drift(photo, png, items)
-        extras = find_extras(png, items, plan["tweaks"])
+        extras = find_extras(photo_bytes, png, items, plan["tweaks"])
         if extras:
             log.warning("job %s: render attempt %s added unrequested item(s): %s", job_id, attempt, extras)
         attempts.append({"attempt": attempt, "checks": checks, "drift": drift, "extras": extras,
@@ -599,14 +721,16 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
     trace["best_attempt"] = best["attempt"]
     storage.save(room_id, f"render_{job_id}.png", pngs[best["attempt"]])
 
-    # Design review by our fine-tuned taste model. Optional: skipped when not configured, None on failure.
-    review = None
+    # Styling ideas for the user: from our Tinker fine-tuned design expert looking at the final render
+    # (the design plan's own tweaks if it isn't configured or fails).
+    styling = [t["instruction"] for t in plan["tweaks"]]
     if reviewer.configured():
         on_stage("review")
         t = time.perf_counter()
-        review = reviewer.review_render(pngs[best["attempt"]])
-        timings["review"] = round(time.perf_counter() - t, 1)
-    trace["review"] = review
+        ideas = [s for s in reviewer.style_suggestions(pngs[best["attempt"]]) if not _mentions_furniture(s)]
+        timings["style_ideas"] = round(time.perf_counter() - t, 1)
+        trace["style_ideas"] = ideas
+        styling = ideas or styling
 
     def card(p: dict) -> dict:
         return {"id": p["id"], "name": p["name"], "category": p.get("category"), "image_url": p.get("image_url"),
@@ -627,8 +751,7 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
             "alternatives": [card(p) for p in products if p.get("category") == it["product"].get("category")
                              and p["id"] not in used][:3],
         } for n, it in enumerate(items, 1)],
-        "styling": [t["instruction"] for t in plan["tweaks"]],
-        "review": review,
+        "styling": styling,
         "timings_s": {**timings, "total": round(time.perf_counter() - t_start, 1)},
         "attempts": [{k: a[k] for k in ("attempt", "drift", "score", "extras")} for a in attempts],
         "needs": needs,

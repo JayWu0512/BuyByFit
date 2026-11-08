@@ -2,7 +2,12 @@
 
 Auth: Google Application Default Credentials (`gcloud auth application-default login` locally, or a
 service account on a server). Project: GOOGLE_CLOUD_PROJECT / VERTEX_PROJECT, else the credentials'
-quota project. Retries 429/503 (per-minute quota) with backoff.
+quota project.
+
+429/503: Gemini on Vertex uses Dynamic Shared Quota, so a 429 means the model's shared pool is busy for a
+moment, not that our project ran out. Short exponential backoff with jitter (~2, 4, 8 s) gets through fastest;
+the old fixed 15/30/45 s waits turned a busy second into a 60-100 s render. After the retries, RateLimited is
+raised so the caller can switch to a model on another pool (see pipeline.render).
 
     text = generate(MODEL, [image_bytes, "prompt"])
     data = generate_json(MODEL, [image_bytes, "prompt"], schema=PydanticModel)
@@ -15,6 +20,7 @@ import base64
 import json
 import logging
 import os
+import random
 import threading
 import time
 import urllib.error
@@ -23,6 +29,18 @@ import urllib.request
 log = logging.getLogger(__name__)
 _creds = None
 _lock = threading.Lock()
+
+BACKOFF_BASE_S = 2.0
+BACKOFF_MAX_S = 4.0
+
+
+class RateLimited(RuntimeError):
+    """The model kept answering 429/503 through every retry."""
+
+
+def backoff(attempt: int) -> float:
+    """A random 2-4 s wait (jitter so parallel callers don't retry in lockstep)."""
+    return random.uniform(BACKOFF_BASE_S, BACKOFF_MAX_S)
 
 
 def _token_and_project() -> tuple[str, str]:
@@ -96,10 +114,12 @@ def generate(model: str, parts: list, *, json_schema: dict | None = None, image_
                 return generate(model, parts, json_schema=json_schema, image_out=image_out, aspect=aspect,
                                 thinking=None, retries=retries, timeout=timeout)
             if e.code in (429, 503) and attempt < retries:
-                wait = 15 * (attempt + 1)
-                log.warning("%s %s, retrying in %ss", model, e.code, wait)
+                wait = backoff(attempt)
+                log.warning("%s %s, retrying in %.1fs", model, e.code, wait)
                 time.sleep(wait)
                 continue
+            if e.code in (429, 503):
+                raise RateLimited(f"{model} {e.code} after {retries} retries: {detail}") from None
             raise RuntimeError(f"{model} {e.code}: {detail}") from None
 
     cand = (out.get("candidates") or [{}])[0]

@@ -31,7 +31,7 @@ const stages: Array<{ key: string; label: string }> = [
   { key: "place", label: "Placing them at their real size" },
   { key: "render", label: "Rendering your room" },
   { key: "verify", label: "Checking sizes and positions" },
-  { key: "review", label: "Our expert AI is reviewing the design" },
+  { key: "review", label: "Our expert AI is refining the design" },
 ];
 
 const POLL_MS = 2500;
@@ -621,30 +621,8 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
               : null}
           </div>
 
-          {result.review ? (
-            <section className="rv-review" aria-labelledby="rv-review-heading">
-              <div className="rv-review-score" aria-label={`Design score ${result.review.overall} out of 10`}>
-                <strong>{result.review.overall}</strong>
-                <span>/10</span>
-              </div>
-              <div className="rv-review-body">
-                <p className="rv-kicker" id="rv-review-heading">
-                  Expert AI review
-                </p>
-                {result.review.verdict ? <p className="rv-review-verdict">{result.review.verdict}</p> : null}
-                {result.review.fixes.length > 0 ? (
-                  <>
-                    <p className="rv-review-sub">How to make it even better</p>
-                    <ul>
-                      {result.review.fixes.map((fix) => (
-                        <li key={fix}>{fix}</li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
+          {/* The expert AI review is internal quality control (it steers the second render and picks the better
+              one); it is deliberately not shown, so the product never critiques its own restyle. */}
 
           {roomId && result.job_id ? <RestyleFeedback jobId={result.job_id} key={result.job_id} roomId={roomId} /> : null}
 

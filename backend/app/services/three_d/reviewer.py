@@ -79,7 +79,46 @@ def parse(text: str) -> dict | None:
         return None
 
 
-def review_render(image: bytes) -> dict | None:
+# Styling ideas for the user: same trained reply format (so the fine-tuned model stays on familiar ground); the
+# pipeline shows only its "fixes", phrased as styling details rather than critique or shopping.
+STYLE_PROMPT = REVIEW_PROMPT + (
+    ' Put in "fixes" up to 3 short expert notes critiquing the STYLE only, the way a senior interior designer '
+    "would: palette, materials and finishes, textures, lighting mood, cohesion and balance of the look, each with "
+    "a concrete styling move. The furniture is final: never suggest changing, selecting, replacing, adding or "
+    "buying furniture, seating or any product. Do not comment on image quality, rendering, realism, scale, size, "
+    "placement, the camera, or any drawn rectangles or numbers."
+)
+# Backstop for the "no product recommendations" rule (the pipeline also drops any idea naming furniture).
+_NEW_THING = re.compile(r"\b(buy|buying|purchase|shop|replace|replacing|swap|select|choose|seating|furniture|"
+                        r"new (?:sofa|bed|chair|table|desk))\b", re.I)
+
+
+# The designer's brief: the expert critiques the user's room as it is now, before the restyle is designed.
+ROOM_PROMPT = REVIEW_PROMPT + (
+    ' This is the room BEFORE a restyle. In "issues" give up to 2 expert notes on what in its current style does '
+    'not work, and in "fixes" up to 2 style directions a designer should take: palette, materials and finishes, '
+    "textures, lighting mood, cohesion and balance of the look. Do not comment on image quality, the camera or the "
+    "photo itself, and do not name brands or products to buy."
+)
+
+
+def room_notes(photo: bytes) -> list[str]:
+    """Up to 4 expert style notes on the room as photographed (what doesn't work, then where to take it); [] if
+    none or the call failed. They brief the designer, they aren't shown to the user."""
+    review = review_render(photo, ROOM_PROMPT)
+    if not review:
+        return []
+    return [n for n in review["issues"][:2] + review["fixes"][:2] if not re.search(r"\b(buy|purchase|shop)\b", n, re.I)]
+
+
+def style_suggestions(image: bytes) -> list[str]:
+    """Up to 3 styling ideas (no products to buy) for a finished render; [] if none or the call failed."""
+    review = review_render(image, STYLE_PROMPT)
+    fixes = (review or {}).get("fixes") or []
+    return [f for f in fixes if not _NEW_THING.search(f)]
+
+
+def review_render(image: bytes, prompt: str = REVIEW_PROMPT) -> dict | None:
     if not configured():
         return None
     body = {
@@ -89,7 +128,7 @@ def review_render(image: bytes) -> dict | None:
         "reasoning_effort": "low",
         "messages": [{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": _jpeg_data_uri(image)}},
-            {"type": "text", "text": REVIEW_PROMPT}]}],
+            {"type": "text", "text": prompt}]}],
     }
     try:
         r = requests.post(f"{TINKER_OAI}/chat/completions", json=body, timeout=TIMEOUT_S,

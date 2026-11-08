@@ -96,6 +96,7 @@ def main():
     ap.add_argument("--lr", type=float)
     ap.add_argument("--rank", type=int, default=32)
     ap.add_argument("--eval-every", type=int, default=10)
+    ap.add_argument("--save-every", type=int, default=50, help="sampler checkpoint every N steps (each ~17 GB)")
     ap.add_argument("--pilot", action="store_true", help="one step of 4 examples, then stop")
     args = ap.parse_args()
 
@@ -146,7 +147,7 @@ def main():
         log.write(json.dumps(m) + "\n")
         log.flush()
         print(json.dumps(m), flush=True)
-        if not args.pilot and step and step % 20 == 0:
+        if not args.pilot and step and step % args.save_every == 0:
             checkpoint_utils.save_checkpoint(training_client=trainer, name=f"{step:05d}", log_path=str(run_dir),
                                              kind="sampler", loop_state={"step": step}, ttl_seconds=7 * 86400)  # sampler only: full state is ~47 GB and fills free storage
 
