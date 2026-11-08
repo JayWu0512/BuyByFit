@@ -38,6 +38,15 @@ create table if not exists products (
 -- web/AR-ready copy of model_3d_url (compressed: 1K textures + Draco), set by ar-mvp/prepare_models.py
 alter table products add column if not exists ar_model_url text;
 
+-- Models without real-world scale (Objaverse): dims are a typical size for the category, and
+-- model_scale is the factor that brings model_3d_url to that size (the 3D viewer applies it).
+alter table products add column if not exists dims_estimated boolean not null default false;
+alter table products add column if not exists model_scale real;
+
+-- Coarse budget/mid/premium tier from the brand line (price_fix.py); used instead of the estimates below,
+-- which proved ~45% off against real Amazon prices and were cleared.
+alter table products add column if not exists price_tier text;
+
 -- Estimated price range for products with no real price (price_estimate.py). Always shown as "Est. $X–$Y";
 -- `price` stays reserved for real retailer prices.
 alter table products add column if not exists est_price_low numeric;

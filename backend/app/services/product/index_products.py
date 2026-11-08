@@ -48,7 +48,11 @@ def to_vector(v: list[float]) -> str:
 
 def upsert_products(cur, products: list[dict]) -> None:
     rows = [tuple(p.get(c) for c in PRODUCT_COLUMNS) for p in products]
-    updates = ", ".join(f"{c} = excluded.{c}" for c in PRODUCT_COLUMNS if c != "id")
+    # Enrichment columns are filled by later steps (abo_captions.py, vibe_tags.py). A re-import doesn't know
+    # them and passes NULL, so keep what's there instead of wiping it.
+    keep = {"caption", "vibe_tags"}
+    updates = ", ".join(f"{c} = coalesce(excluded.{c}, products.{c})" if c in keep else f"{c} = excluded.{c}"
+                        for c in PRODUCT_COLUMNS if c != "id")
     execute_values(
         cur,
         f"insert into products ({', '.join(PRODUCT_COLUMNS)}) values %s "
@@ -64,6 +68,14 @@ def upsert_embeddings(cur, products: list[dict]) -> int:
         (embed.EMBEDDING_MODEL, embed.EMBEDDING_VERSION),
     )
     existing = dict(cur.fetchall())
+    # an import file doesn't carry enrichment (Cap3D caption, CLIP vibe tags); take it from the DB so a
+    # re-import doesn't re-embed products without their style
+    ids = [p["id"] for p in products if not p.get("caption") or not p.get("vibe_tags")]
+    if ids:
+        cur.execute("select id, caption, vibe_tags from products where id = any(%s)", (ids,))
+        enrich = {pid: (cap, tags) for pid, cap, tags in cur.fetchall()}
+        products = [{**p, "caption": p.get("caption") or enrich.get(p["id"], (None, None))[0],
+                     "vibe_tags": p.get("vibe_tags") or enrich.get(p["id"], (None, None))[1]} for p in products]
     todo = [(p["id"], embed.vibe_document(p)) for p in products]
     todo = [(pid, doc) for pid, doc in todo if existing.get(pid) != doc]
     if not todo:

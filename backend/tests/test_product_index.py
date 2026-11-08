@@ -31,6 +31,28 @@ def test_to_vector_literal():
     assert index_products.to_vector([0.1, -0.25]) == "[0.100000,-0.250000]"
 
 
+class _FakeCursor:
+    def __init__(self):
+        self.sql = []
+
+    def mogrify(self, template, args):  # used by execute_values
+        return b"(...)"
+
+    def execute(self, sql, *a):
+        self.sql.append(sql if isinstance(sql, str) else sql.decode())
+
+    connection = type("C", (), {"encoding": "UTF8"})()
+
+
+def test_reimport_keeps_captions_and_vibe_tags():
+    cur = _FakeCursor()
+    index_products.upsert_products(cur, [SOFA])
+    sql = " ".join(cur.sql)
+    assert "caption = coalesce(excluded.caption, products.caption)" in sql
+    assert "vibe_tags = coalesce(excluded.vibe_tags, products.vibe_tags)" in sql
+    assert "title = excluded.title" in sql          # normal columns still update
+
+
 def test_schema_dims_match_model():
     sql = index_products.SCHEMA_SQL.read_text()
     assert f"vector({embed.EMBEDDING_DIM})" in sql
