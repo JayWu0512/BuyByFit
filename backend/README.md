@@ -3,7 +3,7 @@
 The FastAPI service supplies two server-side capabilities:
 
 - Recommendation search: embeds a room brief, retrieves catalogue candidates from PostgreSQL with pgvector, applies practical constraints, and returns the shared product-card contract.
-- Room visualization: accepts a room photo, starts an asynchronous Vertex AI restyling job, exposes progress/results, and stores structured feedback.
+- Room visualization: accepts a room photo, starts an asynchronous Vertex AI restyling job, exposes progress/results, and stores structured feedback. When configured, a Tinker fine-tuned interior expert briefs the design step and returns style-only notes on the final render.
 
 In the standard deployment, browsers do not call this service directly. The Next.js frontend proxies it through same-origin routes using RECOMMENDATION_API_URL and/or ROOM_API_URL.
 
@@ -73,8 +73,11 @@ Attach a least-privileged service account in a deployed environment. Important c
 | THREE_D_BUCKET | Private Cloud Storage bucket for durable room files. Required for durable Cloud Run results. |
 | THREE_D_STORAGE_DIR | Local-development storage override. |
 | THREE_D_DESIGN_MODEL, THREE_D_FAST_MODEL, THREE_D_IMAGE_MODEL | Optional model overrides. |
+| TASTE_REVIEWER_MODEL + TINKER_API_KEY | Optional Thinking Machines fine-tuned reviewer. Both are required to activate it. |
 
 Without THREE_D_BUCKET, files are saved under backend/storage/rooms/. That is appropriate only for local development because ephemeral hosts lose files when restarted. Room images, traces, feedback, and renders are private operational data and must never be committed.
+
+The fine-tuned reviewer is best-effort: when its configuration is absent or a review call fails, room restyling continues without reviewer notes. Its model identifier and API key belong in the GCP secret/configuration system, never in Git.
 
 ## Development boundaries
 

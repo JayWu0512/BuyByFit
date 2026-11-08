@@ -1,8 +1,9 @@
 # Taste model: interior-design review research
 
-> Status: isolated research tooling. It is not part of the BuyByFit web,
-> recommendation, or room-visualization runtime, and its output must not be
-> represented to visitors as an automated guarantee of design quality.
+> Status: training and evaluation tooling for the optional fine-tuned interior
+> expert used by the room-visualization pipeline. It is not a standalone
+> customer-facing service, and its output must not be represented as an
+> automated guarantee of design quality.
 
 Goal: evaluate whether a fine-tuned vision model can judge interior-design
 quality in a designer-like way and explain its reasoning. Source material is

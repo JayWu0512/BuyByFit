@@ -33,8 +33,8 @@ The public card shape is defined in [the API contract](../backend/app/api/API_CO
 1. The visitor takes or uploads a JPEG/PNG room photo and may provide physical room width/depth.
 2. The browser sends that multipart request to a same-origin Next.js room route.
 3. Next.js forwards it to `ROOM_API_URL`, or to `RECOMMENDATION_API_URL` when both capabilities are deployed in the same FastAPI service.
-4. The FastAPI room service stores the input privately, starts an asynchronous Vertex AI job, and returns a job ID.
-5. The browser polls the same-origin status route, displays the completed render through a proxy route, and can send structured feedback.
+4. The FastAPI room service stores the input privately and starts an asynchronous Vertex AI job. When the optional Thinking Machines reviewer is configured, its fine-tuned Inkling 2 Small + LoRA model critiques the original room and supplies the Gemini design brief.
+5. After the selected render is ready, the same expert can return up to three style-only ideas; it does not recommend products. The browser polls the same-origin status route, displays the completed render through a proxy route, and can send structured feedback.
 
 Room images and renders are user-provided/generated content. They belong in private storage, not Git or a public product catalogue. Exact placement is best when the visitor supplies real room measurements; camera-only scale is an estimate.
 
@@ -45,7 +45,7 @@ Room images and renders are user-provided/generated content. They belong in priv
 | Next.js frontend | Interaction design, browser session state, same-origin gateway, product presentation | Expose service origins/secrets or write directly to Supabase from the browser. |
 | Product/catalogue layer | Normalize source product fields, preserve source URLs/media/dimensions, refresh source data | Treat a stale price or listing as verified current inventory. |
 | Recommendation service | Embed queries, apply room/price/category constraints, rank products | Own retailer crawling or room-image processing. |
-| Room service | Validate room uploads, run the asynchronous rendering pipeline, retain job/result metadata and feedback | Make the browser communicate with Vertex AI directly. |
+| Room service | Validate room uploads, run the asynchronous rendering pipeline, coordinate the optional fine-tuned design reviewer, retain job/result metadata and feedback | Make the browser communicate with Vertex AI or Tinker directly. |
 | Supabase/PostgreSQL + pgvector | Product source of truth, embeddings, indexed similarity/fit queries | Hold client-side secrets or bypass RLS. |
 
 ## Reliability and security rules
