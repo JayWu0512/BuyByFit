@@ -348,12 +348,13 @@ export function DiscoverView() {
           <div className="search-results-topline">
             <div className="search-results-copy">
               <h1 id="results-heading">Furniture for your room</h1>
+              <p className="submitted-brief-context">Your current theme</p>
               <p className="submitted-brief">“{submittedBrief}”</p>
             </div>
 
             <div className="results-actions">
               <button className="results-edit-brief" onClick={startOver} type="button">
-                Change your room brief
+                Change theme or room brief
               </button>
             </div>
           </div>
