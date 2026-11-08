@@ -31,9 +31,12 @@ def _matches_colors(product: dict[str, Any], colors: list[str]) -> bool:
 
 
 def _within_price(product: dict[str, Any], min_price: float | None, max_price: float | None) -> bool:
+    # Real scraped prices cover ~0.5% of the catalog; fall back to the calibrated estimate (est_price,
+    # populated for ~99.5% of products) rather than skipping the filter entirely for almost everything.
     price = product.get("price")
     if price is None:
-        # Most of the catalog (ABO dataset) has no price; don't exclude on absence.
+        price = product.get("est_price")
+    if price is None:
         return True
     if min_price is not None and price < min_price:
         return False
@@ -84,6 +87,13 @@ def _product_card(product: dict[str, Any]) -> dict[str, Any]:
         "category": (product.get("product_type") or "").lower() or None,
         "price": product.get("price"),
         "currency": product.get("currency"),
+        "est_price": product.get("est_price"),
+        "est_price_range": (
+            {"low": product.get("est_price_low"), "high": product.get("est_price_high")}
+            if product.get("est_price_low") is not None and product.get("est_price_high") is not None
+            else None
+        ),
+        "price_is_estimated": product.get("price") is None and product.get("est_price") is not None,
         "image_url": image_urls[0] if image_urls else None,
         "image_urls": image_urls,
         "product_url": product.get("url"),
