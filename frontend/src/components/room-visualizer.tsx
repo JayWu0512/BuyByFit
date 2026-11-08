@@ -558,18 +558,18 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
       {phase === "done" && result ? (
         <div className="rv-result">
           <header className="rv-result-head">
-            <div>
+            <div className="rv-result-copy">
               <p className="rv-kicker">Your room, restyled</p>
               <h3>{result.vibe}</h3>
             </div>
             <div className="rv-result-actions">
-              <a className="button button-dark" download="buybyfit-room.png" href={result.render_url}>
-                Download
-              </a>
-              <button className="button rv-light" disabled={!roomId} onClick={restyleAgain} type="button">
+              <button className="button button-dark rv-result-primary" disabled={!roomId} onClick={restyleAgain} type="button">
                 Restyle again
               </button>
-              <button className="text-button" onClick={reset} type="button">
+              <a className="button rv-result-secondary" download="buybyfit-room.png" href={result.render_url}>
+                Download
+              </a>
+              <button className="rv-result-link" onClick={reset} type="button">
                 Try another photo
               </button>
             </div>

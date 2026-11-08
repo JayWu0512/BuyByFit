@@ -353,7 +353,7 @@ export function DiscoverView() {
             </div>
 
             <div className="results-actions">
-              <button className="button button-dark" onClick={startOver} type="button">
+              <button className="results-edit-brief" onClick={startOver} type="button">
                 Change your room brief
               </button>
             </div>
