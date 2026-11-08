@@ -16,14 +16,23 @@ def box_field(description: str = "[ymin, xmin, ymax, xmax] in 0-1000 image coord
 
 class FloorZone(BaseModel):
     id: str = Field(description='"z1", "z2", ...')
-    box_2d: Box = box_field("the visible empty floor area, [ymin, xmin, ymax, xmax] 0-1000")
+    box_2d: Box = box_field("the visible EMPTY floor area (no furniture standing on it), [ymin, xmin, ymax, xmax] 0-1000")
     description: str
+
+
+class ExistingItem(BaseModel):
+    label: str = Field(description='a piece of furniture already in the room, e.g. "bed", "dining chair", "desk"')
+    box_2d: Box = box_field("tight box around the whole piece, [ymin, xmin, ymax, xmax] 0-1000")
+    keep: bool = Field(default=True, description="false only if a pick replaces this piece (its label goes in "
+                                                 "that pick's replaces)")
 
 
 class Analysis(BaseModel):
     room_type: str
     style: str
     lighting: str
+    existing: list[ExistingItem] = Field(default_factory=list,
+                                         description="every piece of furniture already in the photo")
     free_floor_zones: list[FloorZone]
 
 
@@ -33,6 +42,8 @@ class Pick(BaseModel):
     role: str
     zone_id: str
     layout: str = Field(description="against_wall | center | in_front_of:sX | beside:sX | under:sX | on_top_of:sX")
+    replaces: str = Field(default="", description='label of the existing piece this pick replaces (e.g. "dining '
+                                                  'table"), or "" if it is an addition')
 
 
 class Tweak(BaseModel):

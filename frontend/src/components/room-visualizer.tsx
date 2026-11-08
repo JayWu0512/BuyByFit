@@ -31,6 +31,7 @@ const stages: Array<{ key: string; label: string }> = [
   { key: "place", label: "Placing them at their real size" },
   { key: "render", label: "Rendering your room" },
   { key: "verify", label: "Checking sizes and positions" },
+  { key: "review", label: "Our expert AI is refining the design" },
 ];
 
 const POLL_MS = 2500;
@@ -619,6 +620,9 @@ export function RoomVisualizer({ brief, products }: RoomVisualizerProps) {
                 })
               : null}
           </div>
+
+          {/* The expert AI review is internal quality control (it steers the second render and picks the better
+              one); it is deliberately not shown, so the product never critiques its own restyle. */}
 
           {roomId && result.job_id ? <RestyleFeedback jobId={result.job_id} key={result.job_id} roomId={roomId} /> : null}
 

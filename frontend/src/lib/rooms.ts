@@ -33,10 +33,20 @@ export interface VisualizationResult {
     alternatives: VisualizedProduct[];
   }>;
   styling: string[];
+  /** Our fine-tuned design reviewer's verdict on the render; null when the reviewer is off or failed. */
+  review?: DesignReview | null;
   timings_s: Record<string, number>;
 }
 
-export type VisualizationStage = "queued" | "design" | "place" | "render" | "verify" | "done";
+export interface DesignReview {
+  overall: number;
+  scores: Partial<Record<string, number>>;
+  issues: string[];
+  fixes: string[];
+  verdict: string;
+}
+
+export type VisualizationStage = "queued" | "design" | "place" | "render" | "verify" | "review" | "done";
 
 export interface VisualizationJob {
   job_id: string;
