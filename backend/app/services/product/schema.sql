@@ -47,6 +47,10 @@ alter table products add column if not exists model_scale real;
 -- which proved ~45% off against real Amazon prices and were cleared.
 alter table products add column if not exists price_tier text;
 
+-- Single proxy price for products without a real one (price_impute.py): the model's best guess, shown as
+-- "≈ $420"; est_price_low/high below are its confidence band (~60% of real prices fall inside).
+alter table products add column if not exists est_price numeric;
+
 -- Estimated price range for products with no real price (price_estimate.py). Always shown as "Est. $X–$Y";
 -- `price` stays reserved for real retailer prices.
 alter table products add column if not exists est_price_low numeric;

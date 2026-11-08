@@ -105,16 +105,19 @@ def main(argv=None) -> int:
     corr = design(todo, cols) @ w
     rows = []
     for p, c in zip(todo, corr):
-        mid = p["rule"] * math.exp(c)
+        mid = p["rule"] * math.exp(c)          # best single guess (median of the model's error, log scale)
         lo, hi = nice(mid * math.exp(lo_q)), nice(mid * math.exp(hi_q))
-        rows.append((p["id"], lo, max(hi, lo + 5), f"{p['basis']} · calibrated on {len(train)} real Amazon prices",
-                     MODEL_VERSION))
+        rows.append((p["id"], nice(mid), lo, max(hi, lo + 5),
+                     f"{p['basis']} · calibrated on {len(train)} real Amazon prices", MODEL_VERSION))
     conn = psycopg2.connect(database_url(), connect_timeout=20)
     try:
         with conn, conn.cursor() as cur:
-            execute_values(cur, "update products p set est_price_low = v.lo, est_price_high = v.hi, est_price_basis = v.b, "
-                                "est_price_model = v.m from (values %s) as v(id, lo, hi, b, m) where p.id = v.id",
-                           rows, template="(%s, %s::numeric, %s::numeric, %s, %s)", page_size=1000)
+            # est_price: the single proxy price to show ("≈ $420"); low/high stay as its confidence band
+            cur.execute("alter table products add column if not exists est_price numeric")
+            execute_values(cur, "update products p set est_price = v.e, est_price_low = v.lo, est_price_high = v.hi, "
+                                "est_price_basis = v.b, est_price_model = v.m "
+                                "from (values %s) as v(id, e, lo, hi, b, m) where p.id = v.id",
+                           rows, template="(%s, %s::numeric, %s::numeric, %s::numeric, %s, %s)", page_size=1000)
         print(f"imputed {len(rows)} products ({MODEL_VERSION})")
     finally:
         conn.close()
