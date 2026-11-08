@@ -1,1 +1,1 @@
-"""Temporary mock API server and the shared API contract documentation."""
+"""HTTP API modules and shared API contract documentation."""

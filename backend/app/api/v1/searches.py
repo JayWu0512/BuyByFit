@@ -1,13 +1,7 @@
-"""Search/recommendation endpoints -- owned by B per backend/WORKFLOW.md.
+"""Search and recommendation endpoints.
 
-Implements the documented contract (API_CONTRACT.md, MOCK_API.md) backed by
-the real `recommend()` pipeline instead of the mock's tag-overlap scorer.
-Search state is kept in-memory, same as mock_server.py, since there is no
-persisted `searches` table yet (that would be a new entity in
-`app/db/relational.py`, requiring Diwas/Isaac review).
-
-Product and room-media fields still need Diwas/Isaac sign-off before this
-fully replaces mock_server.py as the frontend contract.
+Implements the documented API contract with the real `recommend()` pipeline.
+Search state is process-local because there is no persisted searches table yet.
 """
 
 from __future__ import annotations

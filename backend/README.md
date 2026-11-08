@@ -82,5 +82,3 @@ Without THREE_D_BUCKET, files are saved under backend/storage/rooms/. That is ap
 - Update the API contract, frontend mapping, and tests together when a shared field changes.
 - Do not run retailer scraping in a request handler. Ingest, normalize, verify, and index catalogue data separately.
 - Keep secrets, uploads, renders, database data, and model caches out of Git.
-
-The dependency-free mock server (python -m app.api.mock_server) remains available for contract tests; it is not the production recommendation or room service.

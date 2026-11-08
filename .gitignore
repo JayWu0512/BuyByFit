@@ -230,15 +230,12 @@ frontend/.env.*.local
 frontend/.agents/
 frontend/.taste-skill/
 frontend/.impeccable/config.local.json
-!frontend/src/lib/
-!frontend/src/lib/.gitkeep
 
 # Backend runtime data and credentials
 backend/.env
 backend/.env.*
 !backend/.env.example
 backend/logs/*
-!backend/logs/.gitkeep
 
 # Databases and local infrastructure volumes
 *.sqlite3
