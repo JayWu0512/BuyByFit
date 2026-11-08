@@ -1,21 +1,12 @@
-# Infrastructure
+# Infrastructure and catalogue imports
 
-No infrastructure stack is required for the current self-contained frontend MVP. Run the web app locally from `frontend/` with `npm run dev`.
+`infra/` documents the local inputs and deployment concerns for BuyByFit's live catalogue paths. The Next.js application itself does not require infrastructure to run: without external configuration it uses its bundled fictional catalogue.
 
-When the production search, catalogue, and room services are selected, add the chosen local-development and deployment configuration here (for example Compose, Terraform, or Kubernetes). The design must account for:
+## Catalogue exports
 
-- a relational database for products, room metadata, and job status;
-- a vector database for semantic recommendation retrieval;
-- a queue or job mechanism if room/3D processing is asynchronous;
-- the external 3D provider, which retains uploaded and generated binary assets.
+Local CSV exports such as `products_rows.csv` and `product_embeddings_rows.csv` are ingestion inputs. They are intentionally excluded from Git because they can contain retailer source data, images, descriptions, and embeddings that are refreshed outside this repository.
 
-Keep secrets, persistent database volumes, generated 3D assets, and provider credentials out of Git. The intended service boundaries are described in [the architecture note](../docs/architecture.md).
-
-## Local catalogue exports
-
-`products_rows.csv` and `product_embeddings_rows.csv` are local ingestion exports and intentionally remain outside Git. They contain the product title, retailer URL, images, dimensions, materials, descriptions, and precomputed `BAAI/bge-small-en-v1.5` vectors used by the recommendation service.
-
-To load a matching pair of exports into the configured PostgreSQL database with pgvector:
+The current importer expects a paired product/embedding export and upserts into PostgreSQL with pgvector:
 
 ```bash
 cd backend
@@ -23,4 +14,30 @@ python scripts/import_catalog.py --dry-run
 python scripts/import_catalog.py
 ```
 
-The importer creates the `products` and `product_embeddings` tables when needed and upserts records, so it is safe to rerun when a newer CSV export arrives. It reads the database connection only from `backend/.env` or the process environment; never commit that file.
+The importer creates/updates `products` and `product_embeddings` as needed and is intended to be idempotent for a matching CSV pair. Use a test database and inspect a dry run before replacing production catalogue data.
+
+## Data quality expectations
+
+- Preserve the source product URL, source identifier, image URLs, dimensions, material, description, currency, and collection time where available.
+- Treat missing price as missing—not zero. When a calibrated estimate is present, retain its low/high range and basis separately from a verified source price.
+- Remove or mark records only after an explicit, repeatable availability check. A request failure or bot challenge is not evidence that a product is discontinued.
+- Reject/flag malformed dimensions and unknown units before indexing them for room-fit search.
+- Retain applicable image/model licenses and retailer/source attribution in the import pipeline.
+
+## Runtime topology
+
+| Component | Production responsibility |
+| --- | --- |
+| Vercel / Next.js | Customer UI and same-origin proxy routes. |
+| Supabase or PostgreSQL + pgvector | Product records and vector similarity search. |
+| FastAPI | Recommendation endpoint and optional room visualization. |
+| Private object storage | Room upload/render persistence for the FastAPI room service. |
+| Cloudflare Worker (optional) | Controlled collection/normalization helper; not a public checkout or inventory API. |
+
+Configure connection strings and credentials through local `.env` files or the deployment platform's secret manager. Do not commit database volumes, exports, service-account credentials, uploaded room photos, generated renders, or private keys.
+
+## Operations
+
+Before enabling a live catalogue, establish a documented refresh cadence, source-specific rate limits/terms, an availability policy, and observability for failed imports. The request-serving search path should read indexed data; it should not scrape retailer pages synchronously.
+
+See [the architecture note](../docs/architecture.md), [backend setup](../backend/README.md), and the frontend [environment reference](../frontend/.env.example).

@@ -1,4 +1,11 @@
-# Room designer: scan a room, say a vibe, get it furnished
+# Room designer: research prototype
+
+> Status: experimental companion to ar-mvp. It is separate from the production
+> FastAPI room-visualization service documented in backend/README.md. Its scan,
+> GPU, and device-support notes are prototype guidance rather than supported
+> application behaviour.
+
+# Scan a room, say a vibe, get it furnished
 
 Open **`/room`** on the AR MVP server (`python ar-mvp/server.py`).
 

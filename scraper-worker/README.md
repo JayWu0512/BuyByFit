@@ -1,6 +1,12 @@
-# BuyByFit product scraper API (Service A)
+# BuyByFit product collection worker
 
-A Cloudflare Worker that scrapes furniture product pages and returns normalized JSON or CSV. No database: callers store the output wherever they want.
+> Status: optional internal collection and normalization utility. It is not
+> called by the customer-facing request path and is not a public marketplace,
+> availability, checkout, or price-verification API.
+
+A Cloudflare Worker that collects constrained product-source data and returns
+normalized JSON or CSV. It has no database; callers own storage, validation,
+deduplication, availability checks, and refresh policy.
 
 Sources:
 - **Home Depot**: product by 9-digit id, plus search → product list.
@@ -71,8 +77,12 @@ curl -H "x-api-key: $PW" "https://<worker>/collect?q=mid+century+sofa&limit=10&f
 - `no_product_data`: the page had no usable Product data.
 - `fetch_failed`: a network error.
 
-## Limits / etiquette
+## Limits, legality, and data quality
 
 - Batches are capped at 20 with a 400 ms gap between requests, and pages are cached at Cloudflare's edge for 1 hour.
 - Home Depot may block Cloudflare IPs. Check `/product` first before building on it.
 - Respect each site's terms and robots.txt. Keep pulls small and slow; this is a class prototype.
+- Respect each site's rate limits and applicable law.
+- A successful response is not proof that a product is available or that a
+  price is current. Preserve collection time and source URL, then verify
+  before publishing product data.

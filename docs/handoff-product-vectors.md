@@ -1,4 +1,11 @@
-# Handoff: product data → vector DB for "vibe to home"
+# Historical handoff: product data → vector DB
+
+> Archived planning note written on 2026-11-06. It captures a branch-specific
+> proposal and may not match current code, deployment, providers, catalogue
+> counts, or ownership. Use README.md, docs/architecture.md,
+> backend/README.md, and backend/app/api/API_CONTRACT.md as current sources of
+> truth. Keep this file for rationale only; do not implement it verbatim
+> without validating the present repository and contracts.
 
 Owner: Diwas (A, product service). Written 2026-11-06 from a claude.ai session, for a Claude Code session to continue.
 Branch: `feat/product-scraper-worker` (4 commits on top of `main` @ `89d32cd`). Not pushed yet: the Claude GitHub app isn't installed on `JayWu0512/BuyByFit`, so push from a local clone.

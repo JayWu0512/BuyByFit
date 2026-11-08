@@ -1,16 +1,12 @@
 # BuyByFit frontend
 
-BuyByFit is a furniture-discovery MVP for people furnishing a real room. Rather than beginning with filters, visitors describe the room in their own words and then review a calm, Scandinavian-inspired catalogue of pieces that fit the brief.
+The frontend is a Next.js 15 application for room-first furniture discovery. People describe the space they want to create, browse ranked products, inspect a product in detail, and—when the Python service is configured—upload or capture a room photo for a restyled preview.
 
-The app calls its same-origin search endpoint, which works as a Vercel
-Serverless Function. By default it ranks the small fictional catalogue so a
-demo never depends on an external service. When `RECOMMENDATION_API_URL` is
-configured server-side, it proxies to the FastAPI recommendation service for
-pgvector-ranked catalogue results and real source metadata.
+The browser only calls same-origin `/api/v1/*` routes. Those routes select or proxy server-side integrations, so a browser never receives a backend URL, a database key, or an embedding credential.
 
-## Run locally
+## Requirements and local development
 
-Requirements: Node.js 20.9 or later and npm.
+Use Node.js 20.9 or later (Node 22 LTS is used in CI and Vercel).
 
 ```bash
 cd frontend
@@ -18,50 +14,70 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Useful checks:
+Open [http://localhost:3000](http://localhost:3000). The local fictional catalogue works without any environment variables.
 
 ```bash
 npm run typecheck
 npm run build
 ```
 
-## Routes and behavior
+## Routes
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Brand introduction and product principles. |
-| `/discover` | Free-form room brief. A non-empty submission reveals ranked products; voice dictation is offered when the browser supports the Web Speech API. Live products open their source retailer in a new tab. |
-| `/products/[id]` | Product detail, dimensions, materials, style, and a `Buy it` action for local catalogue items that have a verified retailer URL. |
+| `/` | Brand story and entry point to discovery. |
+| `/discover` | Room brief, optional voice dictation, budget, ranked results, and the optional room-restyling flow. |
+| `/products/[id]` | Product page with facts, related items, retailer link when provided, and optional 3D/AR viewer. |
+| `POST /api/v1/searches` | Server-only search gateway. |
+| `/api/v1/rooms/*` | Server-only proxy routes for the room-visualization API. |
 
-Search text and sorting are kept in tab-scoped session storage, so **Back to your search** returns to the same result state. The serverless fallback returns its 16 fictional products; the configured FastAPI service returns semantic matches from the imported catalogue.
+Search text, search results, sorting, and room-render progress are stored in tab-scoped session storage. They are not shared across browsers or written to a user account.
+
+## Search resolution
+
+`POST /api/v1/searches` resolves integrations in this order:
+
+1. `RECOMMENDATION_API_URL` — proxy to the FastAPI recommendation endpoint.
+2. `SUPABASE_URL` + `SUPABASE_ANON_KEY` — server-side semantic search against the Supabase `match_products` RPC and `products` table.
+3. No configuration — rank the bundled fictional catalogue locally.
+
+If a configured Supabase search fails, the route serves the local demo catalogue rather than failing the visitor's search. If `RECOMMENDATION_API_URL` is configured, its response and errors are passed through so an operational integration issue remains visible.
+
+## Configuration
+
+Copy [`.env.example`](.env.example) to `.env.local` for local work, or configure the same variables in Vercel. Every listed value is server-only.
+
+| Variable | Required for | Notes |
+| --- | --- | --- |
+| `RECOMMENDATION_API_URL` | FastAPI-powered search | Service origin only, for example `https://api.example.com`; do not append `/api/v1/searches`. |
+| `SUPABASE_URL` | Supabase catalogue search and real product pages | Used only if no FastAPI search URL is set. |
+| `SUPABASE_ANON_KEY` | Supabase catalogue search and real product pages | Use a read-only/publishable key protected by Supabase RLS. |
+| `ROOM_API_URL` | Room restyling | FastAPI room-service origin. Falls back to `RECOMMENDATION_API_URL` when omitted. |
+| `AR_ASSET_BASE_URL` | Relative GLB assets | Optional public origin that serves paths stored in `ar_model_url`. |
+| `EMBEDDING_DTYPE` | Supabase semantic search | Optional: `q8` (default) or `fp32` for the server-side embedding runtime. |
+
+Never use `NEXT_PUBLIC_` for these values. Localhost addresses are only valid for local development and must not be used in a production Vercel environment.
+
+## Catalogue and product data
+
+Real records are read server-side from Supabase. The UI supports source titles, description, retailer URL, images, dimensions, material, color, style tags, price, a price estimate, and optional 3D/AR URLs. A retailer link appears only when the record provides `product_url`.
+
+Price and availability are time-sensitive source data. Product pages should not be interpreted as a checkout flow or as a guarantee that a retailer listing remains available.
 
 ## Project map
 
 ```text
-src/app/                   Route pages, shared layout, and global styles
-src/components/            Header, footer, logo, discovery view, and product cards
-src/lib/mock-furniture.ts  Local fictional catalogue
-src/lib/catalog.ts         Product lookup and catalogue helpers
+src/app/                   Pages and Next.js API proxy routes
+src/components/            Discovery, product, room, and shared UI components
+src/lib/api.ts             Browser search client and response mapping
+src/lib/server/supabase.ts Server-only Supabase search/product adapter
+src/lib/server/room-api.ts Server-only room-service forwarding helpers
 src/types/                 Shared TypeScript types
-public/images/             Fictional demonstration photography
-public/brand-mark.svg      BuyByFit browser icon and reusable mark
+public/                    Brand marks and fictional demo imagery
 ```
 
-## Design and content rules
+The visual system is documented in [DESIGN.md](DESIGN.md). Product scope and behaviour are documented in [PRODUCT.md](PRODUCT.md). The cross-service response contract lives in [../backend/app/api/API_CONTRACT.md](../backend/app/api/API_CONTRACT.md).
 
-- The visual system is documented in [DESIGN.md](DESIGN.md); it uses warm paper, oat, sage, timber, and soft asymmetric image corners.
-- The product intent and MVP boundaries are documented in [PRODUCT.md](PRODUCT.md).
-- The fallback catalogue is fictional. Live result data is passed through from local `infra/` CSV exports, including its image and product-source URLs. Verify availability, pricing, and retailer destination before presenting it as a production marketplace.
-- `Buy it` opens a retailer only when a product record supplies `product_url`; otherwise no false purchase action is shown.
+## Deployment
 
-## Backend integration
-
-The search UI calls same-origin `POST /api/v1/searches`. The Next.js route at `src/app/api/v1/searches/route.ts` is a Vercel Serverless Function that ranks the local fictional catalogue for this MVP, so it works without a separate backend deployment.
-
-For the Python/FastAPI recommendation service, load the catalogue and its vectors from `infra/` as described in [../infra/README.md](../infra/README.md), deploy the backend separately, and set server-only `RECOMMENDATION_API_URL` in local or Vercel environment variables. The same browser endpoint then proxies requests to that backend without changing client code. Use only the backend origin, for example `https://buybyfit-api.example.com`—do not add `/api/v1/searches` and do not expose it through a `NEXT_PUBLIC_` variable.
-
-## Deploy on Vercel
-
-The deployment repository is [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit). The source repository publishes this directory to that repository's `main` branch through [the sync workflow](../.github/workflows/sync-vercel-deploy-repo.yml) after each merge to source `main`.
-
-In Vercel, import `buy-by-fit` and use its repository root as the project root. Select the **Next.js** framework preset, leave Output Directory blank, use Node.js 22 LTS, install with `npm ci`, and build with `npm run build`. Node.js `>=20.9.0` is declared in `package.json`.
+This directory is mirrored to [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit) by the source repository's sync workflow. Import that mirror in Vercel with the Next.js preset, `npm ci`, and `npm run build`. See the root [README](../README.md) for mirror-token setup and release workflow.

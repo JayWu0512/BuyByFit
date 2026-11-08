@@ -1,7 +1,12 @@
-# Taste model: an interior design reviewer fine-tuned on Tinker
+# Taste model: interior-design review research
 
-Goal: a vision model (Inkling 2 Small, fine-tuned on Tinker) that judges interior **design** quality the way a
-designer would, and says why. Data: before/after posts from small studios, stagers and restoration firms.
+> Status: isolated research tooling. It is not part of the BuyByFit web,
+> recommendation, or room-visualization runtime, and its output must not be
+> represented to visitors as an automated guarantee of design quality.
+
+Goal: evaluate whether a fine-tuned vision model can judge interior-design
+quality in a designer-like way and explain its reasoning. Source material is
+before/after posts from small studios, stagers, and restoration firms.
 
 ## Setup
 
@@ -9,8 +14,8 @@ designer would, and says why. Data: before/after posts from small studios, stage
 cd taste
 uv sync
 # taste/.env (gitignored):
-#   ANTHROPIC_API_KEY=...   teacher labels (Claude Sonnet 5.5)
-#   TINKER_API_KEY=...      Inkling teacher (optional) and training
+#   ANTHROPIC_API_KEY=...   teacher-label provider
+#   TINKER_API_KEY=...      optional training provider
 ```
 
 ## Pipeline

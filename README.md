@@ -1,16 +1,32 @@
 # BuyByFit
 
-BuyByFit helps people discover furniture for the room they actually have. The current deliverable is a polished, Scandinavian-inspired frontend MVP: visitors describe a room naturally, optionally dictate a brief, and then browse a fictional catalogue with clear dimensions and materials.
+BuyByFit is a room-first furniture discovery experience. A visitor describes the room they want to create, reviews pieces matched to that brief and practical constraints, opens the retailer listing when one is available, and can optionally preview selected results in a photo of their own room.
 
-## Current status
+The repository contains the production-oriented web application, its recommendation and room-visualization service, catalogue tooling, and a small number of research prototypes. It is designed to run usefully with no credentials, while supporting a real Supabase catalogue and separately deployed FastAPI services when configured.
 
-- `frontend/` is a working Next.js 15 application with an always-available local demo catalogue and a same-origin Vercel Serverless search endpoint.
-- A free-form room brief is the primary discovery flow. With `RECOMMENDATION_API_URL` configured, that endpoint forwards to the FastAPI semantic search service, which retrieves from the imported pgvector catalogue.
-- Search copy and sort state persist within the browser tab when a visitor opens a product and returns to results.
-- Source product cards preserve images, descriptions, materials, dimensions, retailer URLs, and optional 3D/AR fields from the local CSV export; local demo products remain explicitly fictional.
-- `backend/` contains the catalogue importer and FastAPI recommendation route, plus a separate temporary mock server for contract work.
+## What is implemented
+
+| Capability | Current implementation |
+| --- | --- |
+| Room-first discovery | Typed room briefs, optional browser voice dictation, budget input, and persistent in-tab results/sort state. |
+| Product results | Same-origin `POST /api/v1/searches`, with a real-catalogue, FastAPI, and local-demo fallback strategy. |
+| Catalogue product pages | Product details, dimensions, materials, price or estimate, retailer link, related products, and optional 3D/AR viewing. |
+| Room restyling | Optional photo upload/capture, room dimensions, asynchronous render progress, download, retry, and structured feedback. Requires the configured Python room service. |
+| Safety and resilience | Server-only service credentials, explicit fallback behaviour, no client-side database writes, and a usable local fictional catalogue. |
+
+## Data and search modes
+
+The browser always calls the Next.js application on its own origin. The search route selects the first available mode below:
+
+1. **FastAPI recommendation service** — set `RECOMMENDATION_API_URL`; the Next.js route proxies to the Python service.
+2. **Supabase catalogue** — set `SUPABASE_URL` and `SUPABASE_ANON_KEY`; the server embeds the brief and calls the `match_products` pgvector function, then retrieves product records through PostgREST.
+3. **Local demonstration catalogue** — when neither integration is configured, the application ranks its bundled fictional products. This keeps local development and previews functional without credentials.
+
+Retailer URLs, availability, prices, images, and 3D assets in a live catalogue are source data and can change. A production deployment must treat the retailer page as the source of truth and keep catalogue refresh/verification jobs under the relevant retailer terms.
 
 ## Quick start
+
+Requirements: Node.js 20.9+ and npm.
 
 ```bash
 cd frontend
@@ -18,7 +34,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Before sharing a change, run:
+Open [http://localhost:3000](http://localhost:3000). Before sharing a frontend change, run:
 
 ```bash
 cd frontend
@@ -26,49 +42,47 @@ npm run typecheck
 npm run build
 ```
 
-For routes, project layout, browser support, mock-data boundaries, and integration notes, see [frontend/README.md](frontend/README.md).
+The app works in local-demo mode with no environment variables. See [frontend/README.md](frontend/README.md) for configuration and route details.
 
-## Vercel deployment
-
-Vercel should import [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit), not this collaboration repository. The GitHub Actions workflow at [`.github/workflows/sync-vercel-deploy-repo.yml`](.github/workflows/sync-vercel-deploy-repo.yml) mirrors this repository's `frontend/` directory to that deployment repository whenever `main` changes. This keeps the team workflow simple: contributors merge only into this repository, and Vercel deploys the mirrored result. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the frontend type-check/build and backend recommendation tests first on every pull request and main-branch update.
-
-One repository secret is required in **JayWu0512/BuyByFit**:
-
-1. Create a fine-grained GitHub personal access token that has **Contents: Read and write** access to **only** `JayWu0512/buy-by-fit`.
-2. Add it as the Actions secret `DEPLOY_REPO_TOKEN` in the source repository.
-3. Ensure `buy-by-fit` is a dedicated deployment mirror. Its `main` branch will be replaced by the contents of `frontend/` on each successful source-repository merge.
-4. Import `buy-by-fit` into Vercel with **Root Directory** set to `./`, **Install Command** `npm ci`, and **Build Command** `npm run build`. Vercel detects Next.js automatically.
-
-Without that secret, the mirror workflow finishes successfully with a visible **skipped** notice rather than failing CI. Configure the secret before expecting Vercel to receive new commits.
-
-`frontend/package.json` declares Node.js `>=20.9.0`, and `package-lock.json` is committed, so Vercel uses a reproducible dependency graph. Select the **Next.js** framework preset in Vercel, leave Output Directory blank, and use Node.js 22 LTS. No `vercel.json` is needed for this standard Next.js deployment.
-
-The deployed frontend's search endpoint is same-origin (`/api/v1/searches`) and works as a Vercel Serverless Function against the fictional MVP catalogue by default. For semantic results from the imported product catalogue, deploy the FastAPI service and configure server-only `RECOMMENDATION_API_URL` with its deployed origin; the route then proxies requests without changing frontend code. `localhost` only works on a developer machine and must never be used as the Production value.
-
-## Repository layout
+## Repository map
 
 ```text
-frontend/     Customer-facing Next.js MVP and static demonstration assets
-backend/      API contract, temporary mock server, and future service boundaries
-docs/         Architecture and integration decisions
-infra/        Deployment and local-infrastructure notes
+frontend/        Next.js customer experience and same-origin proxy routes
+backend/         FastAPI recommendation and room-visualization services
+infra/            Local-only catalogue import guidance and infrastructure notes
+scraper-worker/  Optional Cloudflare Worker for constrained catalogue collection
+ar-mvp/          Standalone AR research prototype; not part of the web deployment
+taste/           Interior-design review research tooling; not part of the web deployment
+docs/            Architecture, integration, and historical handoff material
 ```
 
-## Planned architecture
+## Deployment
+
+The frontend deployment mirror is [`JayWu0512/buy-by-fit`](https://github.com/JayWu0512/buy-by-fit). The workflow at [`.github/workflows/sync-vercel-deploy-repo.yml`](.github/workflows/sync-vercel-deploy-repo.yml) mirrors `frontend/` to that repository after `main` changes; Vercel deploys the mirror as a normal Next.js application.
+
+For Vercel, use Node.js 22 LTS, `npm ci`, and `npm run build`. Configure only server-side environment variables from [frontend/.env.example](frontend/.env.example); do not prefix them with `NEXT_PUBLIC_`. The CI workflow validates the frontend type-check/build and backend recommendation tests on pull requests and on `main`.
+
+For the Python service, see [backend/README.md](backend/README.md). A deployed room service is required before the room-restyling flow can process uploads.
+
+## Architecture
 
 ```text
-BuyByFit frontend
-  └─ Search/recommendation API
-       ├─ Product catalogue service ──> relational database
-       ├─ Recommendation service ─────> vector + relational databases
-       └─ Optional room/3D service ───> external 3D provider
+Browser
+  └─ Next.js frontend and same-origin API routes
+       ├─ FastAPI recommendation service (optional)
+       │    └─ PostgreSQL + pgvector catalogue
+       ├─ Supabase catalogue search (optional)
+       ├─ FastAPI room-visualization service (optional)
+       │    └─ Vertex AI + private file storage
+       └─ Local fictional catalogue (always available fallback)
 ```
 
-The frontend must use an agreed API contract before production services are connected. See [the API contract](backend/app/api/API_CONTRACT.md), [the mock API guide](backend/app/api/MOCK_API.md), and [the architecture note](docs/architecture.md).
+Read [docs/architecture.md](docs/architecture.md) for boundaries and request flow, and [backend/app/api/API_CONTRACT.md](backend/app/api/API_CONTRACT.md) for API shapes.
 
-## Collaboration and safety
+## Engineering practices
 
-- Keep frontend implementation inside `frontend/`; coordinate changes to API contracts and shared documentation with the relevant owners.
-- Never commit `.env` files, API keys, database volumes, generated assets, `node_modules`, or Next.js build output.
-- All current products, prices, retailers, and imagery are fictional demonstration content. Do not publish them as real inventory.
-- The detailed ownership and handoff rules are in [backend/WORKFLOW.md](backend/WORKFLOW.md).
+- Never commit `.env` files, API keys, database dumps, uploads, generated renders, model files, or build output.
+- Keep the public browser API same-origin. Service URLs and Supabase credentials remain server-side.
+- Update the API contract and tests with a shared endpoint or response-field change.
+- Keep live catalogue sourcing, licensing, retailer terms, availability, and prices explicit; do not present stale estimates as verified prices.
+- Read [backend/WORKFLOW.md](backend/WORKFLOW.md) before changing backend contracts or service ownership boundaries.

@@ -1,4 +1,11 @@
-# AR MVP: say a vibe, see the furniture in your room
+# AR MVP: research prototype
+
+> Status: standalone AR research prototype. It is not wired into the deployed
+> Next.js application, Vercel deployment, or current room-restyling flow.
+> Treat the commands and catalogue counts below as prototype instructions,
+> not as a production service-level agreement.
+
+# Say a vibe, see furniture in your room
 
 Speak ("a cozy mid-century sofa that fits 230 by 100") → vibe search in Supabase (pgvector) with a room-fit filter → tap a result → **View in your room**, which places the real-size `.glb` on your floor through the live camera.
 
@@ -64,7 +71,8 @@ Open the `https://….trycloudflare.com` URL it prints on your phone. Anyone wit
 
 - **True size:** ABO models are in metres (checked: chair model 0.82×0.91×0.82 m vs listing 81×81×86 cm). `ar-scale="fixed"` stops pinch-resizing. If a model is more than 25% off its listing, the page rescales it.
 - **One tap is required:** browsers only open AR from a tap, so voice finds the item and the "View in your room" button opens AR.
-- **Catalog:** 8,842 products in Supabase. That's 8,802 from ABO (furniture plus decor such as pillows, planters, vases and bean bags) and 40 plushies from Objaverse.
+- **Catalog:** counts describe the prototype dataset at the time this document
+  was written. Verify the connected Supabase project before relying on them.
 - **AR-ready set:** only products with `products.ar_model_url` appear in AR (about 112 now: 72 ABO + 40 plush). To add more, run `prepare_models.py --per-type 2` and `python -m app.services.product.objaverse_import --limit 80` (from `backend/`).
 - **Plushies** (`backend/app/services/product/objaverse_import.py`): Objaverse/Sketchfab models under CC0, CC BY or CC BY-SA only, with trademarked characters filtered out. Each one stores its author credit in `license`. The models have no real scale, so they're sized by category (a teddy bear is about 35 cm).
 - Data and models: Amazon Berkeley Objects, © Amazon.com, CC BY 4.0. Objaverse models are credited to each author in `products.license`.

@@ -1,52 +1,80 @@
-# API contract rules
+# BuyByFit API contract
 
-This document is the only required starting point for backend API work. Create service or production-route files only when their contract is agreed by the owning backend member and Jay.
+This document is the source of truth for the FastAPI HTTP API consumed through Next.js same-origin proxy routes. Update it, the frontend mapping, and tests together whenever a browser-visible field changes.
 
-## Temporary API contract: mock server
+## Conventions
 
-`mock_server.py` provides an agreed integration target while production services are designed. The current Next.js frontend is self-contained and does **not** call these endpoints yet; when it does, the implementation and this document must be updated together.
+- Base path: /api/v1
+- Content type: JSON unless an endpoint explicitly uses multipart form data.
+- Error body: an object with error.message and error.status.
+- Dimensions: centimetres. Unknown source dimensions are null and must never be represented as zero.
+- Prices: price is a source price when known. price_estimate is a separate optional range and is never a verified price.
+- Product URLs: product_url is an outbound source/retailer URL and must be safe to open in a new tab.
 
-| Endpoint | Owner when production replaces it | Purpose |
-| --- | --- | --- |
-| `POST /api/v1/searches` | A + B + C | Receive first-page filters, style description, and optional room image/video metadata; return a search and first product grid page. |
-| `GET /api/v1/searches/{search_id}/products` | B | Return paginated, ranked product cards. |
-| `GET /api/v1/products/{product_id}` | A | Return product detail. |
-| `GET /api/v1/health` | Shared | Development health check. |
+## Search
 
-Exact request/response examples are in [MOCK_API.md](MOCK_API.md). The mock is temporary: it provides a stable interface for the frontend, not a prescribed production implementation.
+### POST /searches
 
-## Rules for creating a production endpoint
+Creates an in-memory search and returns its first product page. The service accepts JSON or multipart form data; Next.js currently sends JSON.
 
-1. **Contract first.** Before creating a route or service file, add the request/response definition and example payload to this document (or the future OpenAPI document). Name the owning team member.
-2. **Shared fields require agreement.** A, B, and C own their domains; Jay reviews every request or response consumed by the frontend before merge.
-3. **Version and errors.** Keep public endpoints under `/api/v1`. Return JSON errors as `{"error": {"message": "…", "status": 400}}`. Do not silently change or remove a frontend field.
-4. **Media handling.** The input form accepts an optional image/video. The production 3D provider owns uploaded binaries; persist only approved metadata, job status, and safe result URLs. Never return credentials.
-5. **Card response.** Product-grid results must continue to expose `id`, `name`, `price`, `currency`, `image_url`, `image_urls`, `product_url`, `description`, `material`, `color`, `caption`, `model_3d_url`, `ar_model_url`, `dimensions_cm`, `style_tags`, `match_score`, and `match_reason` unless Jay agrees to a coordinated frontend change. `product_url` is the real retailer destination and must be safe to open in a new tab. Also exposes `price_estimate` (`{low, high, basis}` or `null`, present only when `price` is null): the frontend's `ApiProductCard` type already declares this field (it was built independently for the Supabase-fallback search path in `src/lib/server/supabase.ts`), so this backend now matches that existing shape rather than inventing a new one. Real scraped `price` covers ~0.5% of the catalog; the calibrated `est_price`/`est_price_low`/`est_price_high` fields behind `price_estimate` cover ~99.5%. `filters.max_price`/`filters.min_price` on `POST /api/v1/searches` match against the calibrated estimate when `price` is null, instead of skipping the filter.
-6. **Tests with changes.** Each new or changed endpoint requires an API contract test and an update to this document, the relevant frontend client, and the owner handoff in `WORKFLOW.md`.
+Example JSON request:
 
-## First production contracts to agree
+    {
+      "filters": {
+        "categories": ["sofa", "chair"],
+        "colors": ["oak", "beige"],
+        "min_price": 200,
+        "max_price": 1500,
+        "max_width_cm": 220,
+        "max_depth_cm": 100
+      },
+      "style_description": "A calm, light-filled living room with oak and linen."
+    }
 
-| Contract | Backend owner | Must agree with |
-| --- | --- | --- |
-| Product catalog fields and detail response | A — Diwas | B, D |
-| Search filters, ranking response, and explanation | B — Tem | A, C, D |
-| Room media input, 3D job status, preview/scene URL response | C — Isaac | B, D |
+style_description is required. Every filter is optional. Multipart clients send filters as a JSON text field, style_description as text, and may attach a media image/video field for future search workflows.
 
-## Room visualization (C — Isaac) — proposed, needs B + D sign-off
+Success status: 201 Created. The response has a search object (id, created_at, filters, style_description) and results (search_id, products, pagination).
 
-"See these pieces in your room" on Discover: the user's room photo + the brief + the search results already on
-screen -> the room restyled with some of those products, placed at their real size. Implemented in
-`app/api/v1/rooms.py` + `app/services/three_d/`; the frontend calls same-origin Next.js routes with the same paths,
-which forward to this service (`ROOM_API_URL`, else `RECOMMENDATION_API_URL`).
+### GET /searches/{search_id}/products?page=1&per_page=12
+
+Returns a page from a search created by this running process. per_page is clamped to 1–24. Search state is not durable across a service restart.
+
+## Product-card shape
+
+Every result card preserves this stable field set:
+
+| Field | Meaning |
+| --- | --- |
+| id, name | Stable source identifier and product title. |
+| brand, category | Optional source brand and normalized product type. |
+| price, currency | Verified/collected source price and its currency, when known. |
+| price_estimate | Optional low/high/basis range only when price is unavailable. |
+| image_url, image_urls | Primary and alternate source image URLs. |
+| product_url | Outbound retailer/source listing. |
+| description, material, color, caption | Optional source/enriched display information. |
+| model_3d_url, ar_model_url | Optional GLB/AR asset URLs. |
+| dimensions_cm | Object with width, depth, and height in centimetres. |
+| style_tags | Array of descriptive style/vibe tags. |
+| match_score, match_reason | Ranking output and a visitor-readable explanation. |
+
+Fields without source data may be null; style_tags is always an array. The canonical example is maintained by the response mapper in frontend/src/lib/api.ts.
+
+## Room visualization
+
+The browser reaches these endpoints through Next.js. FastAPI owns validation, private storage, job state, and provider calls.
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/v1/rooms` | multipart: `photo` (JPEG/PNG, <= 15 MB), optional `pitch_deg` (phone tilt, -60..89, from the in-page camera) | `201 {room_id, scene, photo_url}` |
-| `POST /api/v1/rooms/{room_id}/visualizations` | `{brief, products: [{id, name, category, width_cm, depth_cm, height_cm, image_url, product_url}]}` (1–30 search results) | `202 {job_id}` |
-| `GET /api/v1/visualizations/{job_id}` | — | `{status: queued\|running\|done\|error, stage: design\|place\|render\|verify\|done, elapsed_s, info: {guide_url?}, result?, error?}` |
-| `POST /api/v1/rooms/{room_id}/visualizations/{job_id}/feedback` | `{verdict: good\|bad, issues: [removed_existing\|missing_piece\|floating\|wrong_size\|wrong_product\|wrong_orientation\|blocks_path\|room_changed\|artifacts\|off_brief\|unrealistic], note?}` (note <= 500 chars; sending again replaces it) | `201 {ok: true}`; `404` if that render doesn't exist |
-| `GET /api/v1/rooms/{room_id}/files/{name}` | — | the room photo, placement guide or render (image) |
+| POST /rooms | Multipart photo (JPEG/PNG, 1 byte–15 MB); optional pitch_deg (-60–89), room_width_cm and room_depth_cm (100–2000) | 201 with room_id, scene, and photo_url |
+| POST /rooms/{room_id}/visualizations | JSON brief plus 1–30 product candidates | 202 with job_id |
+| GET /visualizations/{job_id} | None | Job status, stage, elapsed time, and a result or error. |
+| POST /rooms/{room_id}/visualizations/{job_id}/feedback | good/bad verdict, optional issue IDs and note | 201 with ok true |
+| GET /rooms/{room_id}/files/{name} | None | Stored JPEG/PNG input, guide, or render. JSON files are never served. |
 
-`result`: `{job_id, vibe, photo_url, render_url, items: [{role, product: {id, name, category, image_url, product_url, size_cm}, placed_at_true_size, alternatives: [...]}], styling: [str], timings_s}`.
-A run takes ~30–60 s (Gemini on Vertex: design, true-size placement, image render, size check, one retry), so it
-is a background job polled every ~2.5 s. Errors use the usual `{"error": {"message", "status"}}` shape.
+Each visualization product supplies id, name, optional category, required width_cm/depth_cm/height_cm, and optional image_url/product_url. The room service selects from those candidates; it does not independently crawl retailer sites.
+
+Valid feedback issue IDs: removed_existing, missing_piece, floating, wrong_size, wrong_product, wrong_orientation, blocks_path, room_changed, artifacts, off_brief, and unrealistic.
+
+## Health
+
+GET /health returns status ok and mode live when the FastAPI process is available.

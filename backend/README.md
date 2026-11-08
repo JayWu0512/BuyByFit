@@ -1,63 +1,86 @@
-# Backend
+# BuyByFit backend
 
-Lightweight backend skeleton. API contracts are documented before implementation; each service can use the database adapters in `app/db` directly. Isaac will place the external 3D API client in the `three_d` service when it is needed.
+The FastAPI service supplies two server-side capabilities:
 
-```text
-frontend -> documented API -> service -> db adapter -> database
-                                    └-> external 3D API
-```
+- Recommendation search: embeds a room brief, retrieves catalogue candidates from PostgreSQL with pgvector, applies practical constraints, and returns the shared product-card contract.
+- Room visualization: accepts a room photo, starts an asynchronous Vertex AI restyling job, exposes progress/results, and stores structured feedback.
 
-The external 3D API owns upload processing and generated model files; store only its job/status/URL metadata in the relational database.
+In the standard deployment, browsers do not call this service directly. The Next.js frontend proxies it through same-origin routes using RECOMMENDATION_API_URL and/or ROOM_API_URL.
 
-Before editing an area, check [WORKFLOW.md](WORKFLOW.md). It identifies the responsible person, the precise trigger for updating each module, and the required handoff/tests.
+## Requirements
 
-## Recommendation service
+- Python 3.12
+- PostgreSQL with the vector extension for recommendation search
+- Google Cloud Application Default Credentials for room visualization
+- Local CSV catalogue exports in infra/ when importing a catalogue
 
-The production recommendation route is `POST /api/v1/searches` in
-[`app/api/v1/searches.py`](app/api/v1/searches.py). It embeds the room brief
-with `BAAI/bge-small-en-v1.5`, retrieves the nearest candidates from pgvector,
-then applies category, budget, and dimension limits. Its result cards preserve
-the CSV product metadata: description, images, retailer URL, materials,
-dimensions, captions, and optional 3D/AR URLs.
+## Local setup
 
-Load the local catalogue exports before starting the API:
+    cd backend
+    python -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r requirements.txt
 
-```bash
-python scripts/import_catalog.py --dry-run
-python scripts/import_catalog.py
-uvicorn app.main:app --reload
-```
+Create backend/.env locally; it is ignored by Git:
 
-`RELATIONAL_DATABASE_URL` belongs in `backend/.env` (or the process
-environment) and points to PostgreSQL with the pgvector extension available.
-The importer is idempotent; the source CSV files in `infra/` are intentionally
-ignored by Git. Recommendation shaping and filter order are covered by
-`python -m unittest discover -s tests`.
+    RELATIONAL_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/buybyfit
+    GOOGLE_CLOUD_PROJECT=your-project-id
+    THREE_D_BUCKET=your-private-bucket
 
-`python -m app.api.mock_server` remains available as a contract-only fallback.
-The endpoint field rules and examples are in
-[app/api/API_CONTRACT.md](app/api/API_CONTRACT.md) and
-[app/api/MOCK_API.md](app/api/MOCK_API.md).
+Start the service:
 
-## Room visualization service (Isaac)
+    uvicorn app.main:app --reload --port 8000
 
-`app/api/v1/rooms.py` + `app/services/three_d/` power "See these pieces in your room" on Discover: a room photo,
-the brief and the search results go in; the room comes back restyled with some of those products at their real
-size. Contract: [API_CONTRACT.md](app/api/API_CONTRACT.md) -> Room visualization.
+The health endpoint is GET http://127.0.0.1:8000/api/v1/health.
 
-It calls Gemini on Vertex AI with Google Application Default Credentials:
+## Catalogue import and checks
 
-```bash
-gcloud auth application-default login     # once, locally; a service account on a server
-# optional: GOOGLE_CLOUD_PROJECT=buybyfit  (else the credentials' quota project)
-uvicorn app.main:app --reload --port 8000
-```
+The importer reads the local paired exports under infra/ by default:
 
-Photos and renders are written to `backend/storage/rooms/` (gitignored) and, when `THREE_D_BUCKET` is set, also
-to `gs://$THREE_D_BUCKET/rooms/<room_id>/`. Cloud Run's disk is wiped on restart, so **set it in production**:
-otherwise old results 404. Files missing locally are read back from the bucket. Each run also saves
-`trace_<job>.json` (inputs, design, placements, every attempt's checks, errors) and the result page's
-"How does this look?" saves `feedback_<job>.json`: the data for the reviewer model. Neither is served over HTTP.
-Models are set by `THREE_D_DESIGN_MODEL`, `THREE_D_FAST_MODEL` and
-`THREE_D_IMAGE_MODEL` (defaults: gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-image).
-A run takes ~30-60 s; Vertex's per-minute quota on a new project can add retries (429) on top.
+    python scripts/import_catalog.py --dry-run
+    python scripts/import_catalog.py
+
+Use --products and --embeddings for an alternate matching pair. The importer validates its inputs, creates the required schema when needed, and upserts catalogue records. Validate new exports against a non-production database first.
+
+    python -m compileall -q app scripts
+    python -m unittest discover -s tests -p "test_*.py"
+
+## API surface
+
+| Endpoint | Purpose |
+| --- | --- |
+| POST /api/v1/searches | Create ranked results from a brief and optional filters. |
+| GET /api/v1/searches/{search_id}/products | Retrieve a page from a process-local search. |
+| POST /api/v1/rooms | Validate/store a JPEG or PNG room photo and return a room ID/scene estimate. |
+| POST /api/v1/rooms/{room_id}/visualizations | Start an asynchronous restyling job. |
+| GET /api/v1/visualizations/{job_id} | Read job progress or result. |
+| POST /api/v1/rooms/{room_id}/visualizations/{job_id}/feedback | Store structured result feedback. |
+| GET /api/v1/rooms/{room_id}/files/{name} | Return a room input, guide, or render image. |
+
+The stable HTTP contract, validation rules, and response fields are defined in [app/api/API_CONTRACT.md](app/api/API_CONTRACT.md).
+
+## Room visualization operations
+
+Authenticate locally with Google Application Default Credentials:
+
+    gcloud auth application-default login
+
+Attach a least-privileged service account in a deployed environment. Important configuration:
+
+| Variable | Purpose |
+| --- | --- |
+| GOOGLE_CLOUD_PROJECT or VERTEX_PROJECT | Vertex AI project. |
+| THREE_D_BUCKET | Private Cloud Storage bucket for durable room files. Required for durable Cloud Run results. |
+| THREE_D_STORAGE_DIR | Local-development storage override. |
+| THREE_D_DESIGN_MODEL, THREE_D_FAST_MODEL, THREE_D_IMAGE_MODEL | Optional model overrides. |
+
+Without THREE_D_BUCKET, files are saved under backend/storage/rooms/. That is appropriate only for local development because ephemeral hosts lose files when restarted. Room images, traces, feedback, and renders are private operational data and must never be committed.
+
+## Development boundaries
+
+- Route handlers validate and translate HTTP only; recommendation, storage, and provider work belongs in services.
+- Update the API contract, frontend mapping, and tests together when a shared field changes.
+- Do not run retailer scraping in a request handler. Ingest, normalize, verify, and index catalogue data separately.
+- Keep secrets, uploads, renders, database data, and model caches out of Git.
+
+The dependency-free mock server (python -m app.api.mock_server) remains available for contract tests; it is not the production recommendation or room service.
