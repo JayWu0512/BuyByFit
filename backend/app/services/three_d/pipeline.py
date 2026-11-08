@@ -26,6 +26,7 @@ import json
 import logging
 import math
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -130,6 +131,18 @@ def products_for_room(photo: bytes, brief: str, fallback_products: list[dict]) -
     return (products or fallback_products), needs
 
 
+def _to_room_product(p: dict) -> dict | None:
+    """A recommend() card trimmed to what pipeline.py needs, or None if it has no usable dimensions."""
+    dims = p["dimensions_cm"]
+    if not (dims["width"] and dims["depth"] and dims["height"]):
+        return None
+    return {
+        "id": p["id"], "name": p["name"], "category": p.get("category"),
+        "width_cm": dims["width"], "depth_cm": dims["depth"], "height_cm": dims["height"],
+        "image_url": p.get("image_url"), "product_url": p.get("product_url"),
+    }
+
+
 def _search_for_room(photo: bytes, brief: str) -> tuple[list[dict], list[str]]:
     context = quick_room_context(photo, brief)
     needs = context["needs"]
@@ -139,22 +152,24 @@ def _search_for_room(photo: bytes, brief: str) -> tuple[list[dict], list[str]]:
     )
     from app.services.logic.recommend import recommend  # same deployment, in-process call
 
-    candidates = recommend(enriched_brief, {}, limit=24)
+    products = [p for c in recommend(enriched_brief, {}, limit=24) if (p := _to_room_product(c))]
 
-    products = [
-        {
-            "id": p["id"],
-            "name": p["name"],
-            "category": p.get("category"),
-            "width_cm": p["dimensions_cm"]["width"],
-            "depth_cm": p["dimensions_cm"]["depth"],
-            "height_cm": p["dimensions_cm"]["height"],
-            "image_url": p.get("image_url"),
-            "product_url": p.get("product_url"),
-        }
-        for p in candidates
-        if p["dimensions_cm"]["width"] and p["dimensions_cm"]["depth"] and p["dimensions_cm"]["height"]
-    ]
+    # Pure style-similarity search can crowd a needed category out entirely when every option in it is a
+    # poor style match (seen in practice: an "oak tones" brief ranked oak-toned nightstands above every
+    # bed, none of which happen to be oak-colored in the catalog) -- design()'s needs_hint can only force a
+    # pick that's actually in this list, so for the most critical needs, search the need alone (ranked by
+    # category relevance, not competing against the full style query) and add a few options if nothing
+    # already covers it. These are appended, not prepended: a real style match should still win the pick.
+    seen_ids = {p["id"] for p in products}
+    for need in needs[:2]:
+        if _need_covered(need, products):
+            continue
+        for c in recommend(need, {}, limit=3):
+            extra = _to_room_product(c)
+            if extra and extra["id"] not in seen_ids:
+                products.append(extra)
+                seen_ids.add(extra["id"])
+
     return products, needs
 
 
@@ -165,14 +180,17 @@ _FURNITURE_WORDS = (
     "wardrobe", "armoire", "cabinet", "bookshelf", "bookcase", "nightstand", "night stand", "ottoman",
     "bench", "shelving", "shelf", "console",
 )
+# Word-boundary, not substring: a plain `"bed" in text` match also fires on "bedside", "bedding",
+# "bedroom" -- all real strings that show up in product names and need text (seen in practice: a
+# "Bedside Cabinet/Nightstand" product falsely counted as covering a "bed" need).
+_FURNITURE_WORD_RE = re.compile(r"\b(?:" + "|".join(re.escape(w) for w in _FURNITURE_WORDS) + r")\b")
 
 
 def _mentions_furniture(instruction: str) -> bool:
     """A tweak is meant to be non-furniture (see design()'s prompt); this is the Python-side backstop
     for when the model names a furniture item in one anyway, which render() would otherwise draw into
     the image with no real product behind it."""
-    lowered = instruction.lower()
-    return any(word in lowered for word in _FURNITURE_WORDS)
+    return bool(_FURNITURE_WORD_RE.search(instruction.lower()))
 
 
 def _need_covered(need: str, items: list[dict]) -> bool:
@@ -180,10 +198,14 @@ def _need_covered(need: str, items: list[dict]) -> bool:
     `items` (either the design's picks or the full candidate list). Only checks the furniture nouns in
     _FURNITURE_WORDS -- a need like "more natural light" or "window treatments" has no product category to
     match against, so there's nothing to deterministically enforce for it; treated as trivially covered."""
-    need_words = [w for w in _FURNITURE_WORDS if w in need.lower()]
+    need_words = set(_FURNITURE_WORD_RE.findall(need.lower()))
     if not need_words:
         return True
-    return any(w in f"{it.get('name', '')} {it.get('category', '')}".lower() for it in items for w in need_words)
+    # DB categories come through as e.g. "bed_frame" (see recommend.py's _product_card); regex \b treats
+    # "_" as a word character, so \bbed\b would never match inside it without this replace.
+    item_words = (set(_FURNITURE_WORD_RE.findall(f"{it.get('name', '')} {it.get('category', '')}".replace("_", " ").lower()))
+                 for it in items)
+    return any(need_words & words for words in item_words)
 
 
 def design(photo: bytes, brief: str, products: list[dict], needs: list[str] | None = None,
