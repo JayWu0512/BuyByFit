@@ -1,0 +1,41 @@
+# Seed pages for scrape.py: small studios, stagers and restoration firms with before/after or project galleries.
+# One URL per line; "#" starts a comment. Not here on purpose: Houzz (its terms forbid scraping), big magazines,
+# and virtual-staging vendors (their "after" images are renders, not real rooms).
+
+# Interior design studios
+https://www.margaritabravo.com/blog/denver-greenwood-village-home-renovation
+https://www.juliettesinteriors.co.uk/before-after-transforming-london-living-room/
+https://www.obeliskhome.com/before-and-after-1
+https://www.mybespokeroom.com/inspiration/our-best-before-and-afters
+https://laurau.com/?p=245478
+
+# Home staging (real, physical staging)
+https://www.homestagingresources.com/category/home_staging_before_and_after_photos/page/2
+https://seattledreamhomes.com/home-staging-before-and-after-photos/
+https://www.madcitydreamhomes.com/blog/staging-an-occupied-home.html
+
+# Restoration / renovation firms
+https://hampsteadrenovations.co.uk/areas/gallery/period-restoration
+https://wheathills.com/before-restoration.html
+https://mosbybuildingarts.com/?p=5023
+
+# Makeover blogs
+https://angelamariemade.com/primary-bedroom-makeover-builder-grade-to-charming-retreat/
+https://danslelakehouse.com/2022/03/mid-century-modern-coastal-bedroom-makeover-before-after.html
+https://www.younghouselove.com/about-2/other-redos
+
+# Added for the full crawl (small studios, remodelers, DIY makeover blogs)
+https://leslie-price-wyvy.squarespace.com/accessible-interior-design-blog/before-and-after-design-studiopart-ii
+https://housedesigner.com/our-favourite-room-designs/
+https://www.crddesignbuild.com/blog/amazing-transformations-before-and-after-kitchen-remodels
+https://carlaaston.com/designed/remodel-project-reveal-update-for-remarkable-property
+https://www.sites.google.com/view/pamelahardydesigns/gallery
+https://www.decorilla.com/online-decorating/tag/before-after
+https://southernhospitalityblog.com/budget-friendly-living-room-transformation-before-after/
+https://www.diydecormom.com/living-room-reveal/
+https://homemadebycarmona.com/living-room-makeover-reveal/
+https://www.cravingsomecreativity.com/home-tour/diy-home-decor-renovations-makeovers/
+https://www.fynesdesigns.com/living-room-makeover-before-and-after/
+https://www.abbottsathome.com/?p=6780
+https://tarynwhiteaker.com/5-steps-to-a-budget-friendly-room-makeover/
+https://angelamariemade.com/living-room-makeover-reveal/

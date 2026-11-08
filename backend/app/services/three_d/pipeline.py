@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from . import storage
+from . import reviewer, storage
 from .scene import Camera
 from .schemas import Design, Detection
 from .vertex import generate, generate_json
@@ -404,6 +404,15 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
     trace["best_attempt"] = best["attempt"]
     storage.save(room_id, f"render_{job_id}.png", pngs[best["attempt"]])
 
+    # Design review by our fine-tuned taste model. Optional: skipped when not configured, None on failure.
+    review = None
+    if reviewer.configured():
+        on_stage("review")
+        t = time.perf_counter()
+        review = reviewer.review_render(pngs[best["attempt"]])
+        timings["review"] = round(time.perf_counter() - t, 1)
+    trace["review"] = review
+
     def card(p: dict) -> dict:
         return {"id": p["id"], "name": p["name"], "category": p.get("category"), "image_url": p.get("image_url"),
                 "product_url": p.get("product_url"), "size_cm": _size_cm(p)}
@@ -424,6 +433,7 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
                              and p["id"] not in used][:3],
         } for n, it in enumerate(items, 1)],
         "styling": [t["instruction"] for t in plan["tweaks"]],
+        "review": review,
         "timings_s": {**timings, "total": round(time.perf_counter() - t_start, 1)},
         "attempts": [{k: a[k] for k in ("attempt", "drift", "score")} for a in attempts],
     }
