@@ -11,36 +11,36 @@ const collection = furnitureProducts.slice(0, 3);
 export default function HomePage() {
   return (
     <main>
-      <div className="page-shell home-shell">
-        <SiteHeader active="home" />
-        <section className="home-hero" aria-labelledby="hero-heading">
-          <div className="hero-copy">
-            <h1 id="hero-heading">Furniture that fits.</h1>
-            <p className="hero-intro">Describe the room in your own words, then discover pieces to consider.</p>
-            <Link className="button button-dark hero-button" href="/discover">
-              Explore furniture
-            </Link>
-          </div>
-          <div className="hero-media">
-            <Image
-              alt="Fictional Scandinavian living room with linen seating, warm wood, and soft daylight"
-              fill
-              priority
-              sizes="(max-width: 860px) 100vw, 58vw"
-              src="/images/hjem-living-room.jpg"
-              style={{ objectFit: "cover", objectPosition: "right center" }}
-            />
-          </div>
-        </section>
+      <div className="home-hero-band">
+        <div className="page-shell home-shell">
+          <SiteHeader active="home" />
+          <section className="home-hero" aria-labelledby="hero-heading">
+            <div className="hero-copy">
+              <h1 id="hero-heading">Furniture that fits.</h1>
+              <p className="hero-intro">Describe the room in your own words, then discover pieces to consider.</p>
+              <Link className="button button-dark hero-button" href="/discover">
+                Explore furniture
+              </Link>
+            </div>
+            <div className="hero-media">
+              <Image
+                alt="Fictional Scandinavian living room with linen seating, warm wood, and soft daylight"
+                fill
+                priority
+                sizes="(max-width: 860px) 100vw, 58vw"
+                src="/images/hjem-living-room.jpg"
+                style={{ objectFit: "cover", objectPosition: "right center" }}
+              />
+            </div>
+          </section>
+        </div>
       </div>
 
-      <div className="page-shell">
-        <section className="home-statement" id="about" aria-label="How BuyByFit works">
-          <p>
-            Start with the room. Describe what you want to live with, not just what you want to buy.
-          </p>
-        </section>
-      </div>
+      <section className="home-statement-band" id="about" aria-label="How BuyByFit works">
+        <div className="page-shell home-statement">
+          <p>Start with the room. Describe what you want to live with, not just what you want to buy.</p>
+        </div>
+      </section>
 
       <section className="home-method page-shell" aria-labelledby="method-heading">
         <div className="method-heading">

@@ -13,9 +13,7 @@ export function SiteFooter() {
         <div className="footer-links">
           <Link href="/discover">Discover furniture</Link>
           <Link href="/#about">How it works</Link>
-          <a href="mailto:hello@buybyfit.example">hello@buybyfit.example</a>
         </div>
-        <p className="footer-note">A fictional furniture discovery demonstration. Product images and retailers are placeholders.</p>
       </div>
     </footer>
   );
