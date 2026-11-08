@@ -51,6 +51,16 @@ class Design(BaseModel):
     plan: Plan
 
 
+class RoomContext(BaseModel):
+    room_type: str
+    style: str = Field(description="current colors/materials/style, briefly")
+    needs: list[str] = Field(
+        description="up to 4 furniture/decor categories this room is missing or could use, most important "
+        "first (e.g. an empty bedroom needs a bed, nightstand, dresser -- not just lamps or decor)",
+        max_length=4,
+    )
+
+
 class FoundItem(BaseModel):
     n: int
     found: bool
@@ -59,3 +69,19 @@ class FoundItem(BaseModel):
 
 class Detection(BaseModel):
     items: list[FoundItem]
+
+
+class ExtraItem(BaseModel):
+    description: str = Field(
+        description='short description of the piece, e.g. "a woven jute rug under the bed" or "a floor lamp '
+        'by the window"'
+    )
+
+
+class Extras(BaseModel):
+    extras: list[ExtraItem] = Field(
+        description="furniture, rugs, or large decor visible in the image that is not one of the numbered "
+        "products and isn't explained by an approved styling touch -- i.e. something the model drew in on "
+        "its own that isn't part of the plan. Empty if there's nothing extra.",
+        max_length=6,
+    )

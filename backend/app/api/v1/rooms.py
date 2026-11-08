@@ -1,6 +1,7 @@
 """Room visualization endpoints -- owned by C (Isaac) per backend/WORKFLOW.md.
 
-    POST /api/v1/rooms                              photo (+ pitch_deg) -> {room_id, scene}
+    POST /api/v1/rooms                              photo (+ pitch_deg, room_width_cm, room_depth_cm)
+                                                     -> {room_id, scene}
     POST /api/v1/rooms/{room_id}/visualizations     {brief, products} -> 202 {job_id}
     GET  /api/v1/visualizations/{job_id}            progress, then the result
     POST /api/v1/rooms/{room_id}/visualizations/{job_id}/feedback   {verdict, issues, note} -> 201
@@ -8,7 +9,12 @@
 
 `products` are the search results the page already has (POST /api/v1/searches cards, flattened); the
 service picks from them, places them at true size in the photo and renders the room restyled.
-Contract: API_CONTRACT.md -> "Room visualization".
+
+room_width_cm/room_depth_cm are optional, user-typed real floor dimensions. The camera model (scene.py)
+has no ground-truth scale calibration at all -- it's a pure estimate from phone pitch + assumed camera
+height, so Gemini's zone-drawing and the true-size placement check both inherit that uncertainty. Knowing
+the actual room size gives pipeline.py an independent signal to ground zone-sizing against, instead of
+only ever trusting a hand-drawn 2D box. Contract: API_CONTRACT.md -> "Room visualization".
 """
 
 from __future__ import annotations
@@ -35,7 +41,12 @@ JOB_ID = re.compile(r"^[a-f0-9]{12}$")
 
 
 @router.post("/rooms", status_code=201)
-async def create_room(photo: UploadFile = File(...), pitch_deg: float | None = Form(default=None)):
+async def create_room(
+    photo: UploadFile = File(...),
+    pitch_deg: float | None = Form(default=None),
+    room_width_cm: float | None = Form(default=None),
+    room_depth_cm: float | None = Form(default=None),
+):
     data = await photo.read(MAX_PHOTO_BYTES + 1)
     if not data or len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="photo must be 1 byte to 15 MB")
@@ -48,12 +59,17 @@ async def create_room(photo: UploadFile = File(...), pitch_deg: float | None = F
     img.thumbnail((MAX_SIDE, MAX_SIDE))
     if pitch_deg is not None and not -60 <= pitch_deg <= 89:
         raise HTTPException(status_code=400, detail="pitch_deg must be between -60 and 89")
+    for name, value in (("room_width_cm", room_width_cm), ("room_depth_cm", room_depth_cm)):
+        if value is not None and not 100 <= value <= 2000:
+            raise HTTPException(status_code=400, detail=f"{name} must be between 100 and 2000 cm")
 
     room_id, _ = storage.new_room()
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=90)
     storage.save(room_id, "photo.jpg", buf.getvalue())
     scene = scene_from_sensors(*img.size, pitch_deg)
+    if room_width_cm is not None and room_depth_cm is not None:
+        scene["room_cm"] = {"width": room_width_cm, "depth": room_depth_cm}
     storage.save(room_id, "scene.json", json.dumps(scene))
     return {"room_id": room_id, "scene": scene, "photo_url": storage.file_url(room_id, "photo.jpg")}
 
