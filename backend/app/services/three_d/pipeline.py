@@ -429,23 +429,31 @@ box_2d tight around the whole piece of furniture (legs included), 0-1000 coordin
     return out
 
 
-def find_extras(render_png: bytes, items: list[dict], tweaks: list[dict]) -> list[str]:
+def find_extras(photo: bytes, render_png: bytes, items: list[dict], tweaks: list[dict]) -> list[str]:
     """Image models are unreliable at negative instructions ("don't add X") -- render()'s prompt already
     tells it not to invent furniture, but that alone isn't enough to stop it (seen in practice: a rug drawn
     in with no product or tweak behind it). This checks the actual pixels afterward instead of just trusting
-    the prompt, so a hallucinated, unpurchasable piece can be caught and penalised like a missing one is."""
+    the prompt, so a hallucinated, unpurchasable piece can be caught and penalised like a missing one is.
+
+    Compares against the ORIGINAL photo, not just the numbered products -- a real, already-furnished room
+    (an existing bed, posters, a guitar on the wall) gets faithfully carried over into the restyle per
+    render()'s own "keep the room... exactly the same" instruction, and that is correct, not a hallucination.
+    Flagging anything furniture-shaped in the render, pre-existing or not, falsely tanked the score of every
+    attempt on a furnished room (seen in practice: real bedroom items scored as if invented from nothing)."""
     names = "\n".join(f"{n}. {it['product']['name'][:80]}" for n, it in enumerate(items, 1))
     approved = "\n".join(f"  - {t['instruction']}" for t in tweaks) or "  - none"
-    found = generate_json(FAST_MODEL, [render_png, f"""This room should contain exactly these numbered products,
-and nothing else new:
+    found = generate_json(FAST_MODEL, [photo, render_png, f"""Image 1 is the room's original photo, before any
+restyling. Image 2 is it restyled toward the brief. The restyle should contain exactly these numbered
+products, and nothing else NEW:
 {names}
 
 These approved styling touches are also expected (not products, but intentional -- don't flag them):
 {approved}
 
-List any OTHER furniture, rug, lamp, plant, or large decor visible that isn't one of the numbered products
-and isn't explained by an approved styling touch above. Ignore the room's own pre-existing fixtures (windows,
-built-in lighting already in the original photo, trim). Empty list if there's nothing extra."""],
+List any OTHER furniture, rug, lamp, plant, or large decor visible in Image 2 that is NOT one of the
+numbered products, is NOT explained by an approved styling touch above, AND does not already appear
+somewhere in Image 1 -- i.e. something genuinely new that the restyle invented, not something that was
+simply already in the room and got carried over. Empty list if there's nothing genuinely new and extra."""],
                           schema=Extras, thinking="minimal")
     return [e["description"] for e in found["extras"]]
 
@@ -615,7 +623,7 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
         on_stage("verify", {"attempt": attempt})
         checks = verify(png, items)
         drift = room_drift(photo, png, items)
-        extras = find_extras(png, items, plan["tweaks"])
+        extras = find_extras(photo_bytes, png, items, plan["tweaks"])
         if extras:
             log.warning("job %s: render attempt %s added unrequested item(s): %s", job_id, attempt, extras)
         attempts.append({"attempt": attempt, "checks": checks, "drift": drift, "extras": extras,
