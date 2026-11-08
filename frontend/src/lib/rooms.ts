@@ -6,7 +6,7 @@ import { FurnitureProduct } from "@/types/furniture";
 export interface RoomScene {
   room_id: string;
   photo_url: string;
-  scene: { pitch_deg: number; source: "sensors" | "defaults" };
+  scene: { pitch_deg: number; source: "sensors" | "defaults"; room_cm?: { width: number; depth: number } };
 }
 
 export interface VisualizedProduct {
@@ -64,10 +64,19 @@ async function asJson<T>(response: Response): Promise<T> {
   return body;
 }
 
-export async function createRoom(photo: Blob, pitchDeg: number | null): Promise<RoomScene> {
+export async function createRoom(
+  photo: Blob,
+  pitchDeg: number | null,
+  roomWidthCm: number | null,
+  roomDepthCm: number | null,
+): Promise<RoomScene> {
   const form = new FormData();
   form.append("photo", photo, "room.jpg");
   if (pitchDeg !== null) form.append("pitch_deg", String(Math.round(pitchDeg * 10) / 10));
+  if (roomWidthCm !== null && roomDepthCm !== null) {
+    form.append("room_width_cm", String(roomWidthCm));
+    form.append("room_depth_cm", String(roomDepthCm));
+  }
   return asJson<RoomScene>(await fetch("/api/v1/rooms", { method: "POST", body: form }));
 }
 
