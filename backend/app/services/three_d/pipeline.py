@@ -175,8 +175,19 @@ def _mentions_furniture(instruction: str) -> bool:
     return any(word in lowered for word in _FURNITURE_WORDS)
 
 
+def _need_covered(need: str, items: list[dict]) -> bool:
+    """Whether `need` (free text like "bed frame and mattress") is represented by name or category in
+    `items` (either the design's picks or the full candidate list). Only checks the furniture nouns in
+    _FURNITURE_WORDS -- a need like "more natural light" or "window treatments" has no product category to
+    match against, so there's nothing to deterministically enforce for it; treated as trivially covered."""
+    need_words = [w for w in _FURNITURE_WORDS if w in need.lower()]
+    if not need_words:
+        return True
+    return any(w in f"{it.get('name', '')} {it.get('category', '')}".lower() for it in items for w in need_words)
+
+
 def design(photo: bytes, brief: str, products: list[dict], needs: list[str] | None = None,
-           room_cm: dict | None = None) -> dict:
+           room_cm: dict | None = None, feedback: str = "") -> dict:
     listing = "\n".join(f"p{i} | {p['name'][:90]} | {p.get('category') or 'furniture'} | {_size_cm(p)} (W x D x H)"
                         for i, p in enumerate(products, 1))
     room_size_hint = ""
@@ -225,7 +236,8 @@ These products were already matched to the brief (reference | name | category | 
    declutter). A tweak must never describe a piece of furniture (no beds, tables, chairs, lamps, rugs,
    shelves, etc.) -- if you want a furniture item in the room, it belongs in picks, above, as an actual
    product reference, not as tweak text. Tweaks only ever get an instruction in words; nothing in a tweak
-   is placed, sized, or guaranteed to appear in the final image."""], schema=Design)
+   is placed, sized, or guaranteed to appear in the final image.
+{feedback}"""], schema=Design)
 
 
 # ---------------------------------------------------------------- placement (true size)
@@ -515,10 +527,26 @@ def _run(room_id: str, job_id: str, brief: str, products: list[dict], on_stage, 
     on_stage("design")
     t = time.perf_counter()
     designed = design(photo_bytes, brief, products, needs, room_cm)
-    timings["design"] = round(time.perf_counter() - t, 1)
-    trace["design"] = designed
     plan, zones = designed["plan"], {z["id"]: z for z in designed["analysis"]["free_floor_zones"]}
     by_ref = {f"p{i}": p for i, p in enumerate(products, 1)}
+    # Backstop for the needs_hint instruction above ("you MUST include a pick for the #1 need"): the prompt
+    # reduces this, but can't guarantee it -- seen in practice: 24 real candidates including a bed, and the
+    # model still only picked a nightstand and a dresser. One retry with explicit feedback, same pattern as
+    # render()'s attempt loop, rather than silently shipping a bedroom with no bed.
+    top_need = needs[0] if needs else None
+    if top_need and _need_covered(top_need, products) \
+            and not _need_covered(top_need, [by_ref[p["product_ref"]] for p in plan["picks"] if p["product_ref"] in by_ref]):
+        log.warning("job %s: design dropped the #1 need (%r) despite a matching candidate; retrying design once",
+                    job_id, top_need)
+        designed = design(photo_bytes, brief, products, needs, room_cm,
+                          feedback=f'You didn\'t include a pick for the room\'s #1 need, "{top_need}", even '
+                                   "though a matching product is in the list above. Add it as a real pick "
+                                   "this time -- a styling tweak doesn't count.")
+        plan, zones = designed["plan"], {z["id"]: z for z in designed["analysis"]["free_floor_zones"]}
+        if not _need_covered(top_need, [by_ref[p["product_ref"]] for p in plan["picks"] if p["product_ref"] in by_ref]):
+            log.warning("job %s: design still didn't include the #1 need (%r) after a retry", job_id, top_need)
+    timings["design"] = round(time.perf_counter() - t, 1)
+    trace["design"] = designed
     # Backup for the prompt instruction above (tweaks must not describe furniture): the prompt reduces
     # this, but can't guarantee it. A furniture-sounding tweak reaching render() gets drawn into the image
     # with no product behind it -- unlinked, unpriced, not really recommended -- which is worse than just
