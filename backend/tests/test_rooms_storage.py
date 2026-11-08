@@ -77,7 +77,9 @@ class BucketStorageTest(StorageCase):
 
     def test_create_room_saves_photo_and_scene(self):
         upload = UploadFile(file=io.BytesIO(jpeg()), filename="room.jpg")
-        room_id = asyncio.run(rooms.create_room(photo=upload, pitch_deg=None))["room_id"]
+        room_id = asyncio.run(
+            rooms.create_room(photo=upload, pitch_deg=None, room_width_cm=None, room_depth_cm=None)
+        )["room_id"]
         self.assertIn(f"{room_id}/photo.jpg", self.objects)
         self.assertIn(f"{room_id}/scene.json", self.objects)
 
