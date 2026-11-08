@@ -211,7 +211,6 @@ export function DiscoverView() {
         <div className="search-prompt-stage">
           <div className="search-prompt-copy">
             <h1 id="discover-heading">Find what fits.</h1>
-            <p>Speak or type what your room needs. Describe the feeling, the limits, or the piece you have in mind.</p>
 
             <form className="room-search-form" onSubmit={submitBrief} noValidate>
               <div className="room-prompt-topline">

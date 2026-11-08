@@ -382,6 +382,11 @@ h2 {
   gap: clamp(1.1rem, 2.3vw, 2.3rem);
 }
 
+.home-closing-band {
+  background: var(--timber);
+  color: var(--surface);
+}
+
 .home-closing {
   display: grid;
   grid-template-columns: 1.2fr minmax(200px, 0.55fr) auto;
@@ -389,8 +394,6 @@ h2 {
   gap: var(--space-4);
   padding-top: var(--space-5);
   padding-bottom: var(--space-5);
-  background: var(--timber);
-  color: var(--surface);
 }
 
 .home-closing .section-kicker {
@@ -466,7 +469,8 @@ h2 {
 .search-prompt-stage {
   display: grid;
   width: 100vw;
-  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+  column-gap: clamp(2rem, 4vw, 5rem);
   min-height: min(640px, calc(100svh - 130px));
   margin-left: calc(50% - 50vw);
   padding-inline: max(1.1rem, calc((100vw - 1500px) / 2 + clamp(1.1rem, 3.3vw, 4rem)));
@@ -475,26 +479,28 @@ h2 {
 }
 
 .search-prompt-copy {
+  min-width: 0;
   align-self: center;
   padding: clamp(2rem, 4vw, 4.75rem) 0;
 }
 
-.search-prompt-copy h1,
-.search-results-copy h1 {
+.search-prompt-copy h1 {
   max-width: 12ch;
   margin: 0;
   font-size: clamp(3.1rem, 5.6vw, 6rem);
   text-wrap: balance;
 }
 
-.search-prompt-copy > p {
-  max-width: 44ch;
-  margin: 1.35rem 0 0;
-  font-size: clamp(1.05rem, 1.25vw, 1.25rem);
+.search-results-copy h1 {
+  max-width: none;
+  margin: 0;
+  font-size: clamp(2.7rem, 4.8vw, 5.5rem);
+  white-space: nowrap;
 }
 
 .room-search-form {
   display: grid;
+  max-width: 44rem;
   gap: 0.75rem;
   margin-top: clamp(1.8rem, 3vw, 2.8rem);
 }
@@ -1451,6 +1457,10 @@ h2 {
   .search-prompt-copy h1,
   .search-results-copy h1 {
     font-size: clamp(2.65rem, 11vw, 3.5rem);
+  }
+
+  .search-results-copy h1 {
+    white-space: normal;
   }
 
   .room-prompt-topline {

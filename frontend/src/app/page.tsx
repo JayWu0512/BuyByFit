@@ -78,14 +78,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="home-closing page-shell" aria-labelledby="closing-heading">
-        <div>
-          <h2 id="closing-heading">Let the room decide.</h2>
+      <section className="home-closing-band" aria-labelledby="closing-heading">
+        <div className="home-closing page-shell">
+          <div>
+            <h2 id="closing-heading">Let the room decide.</h2>
+          </div>
+          <p>Describe your space, then browse 16 clearly fictional furniture samples while the recommendation model is still in demo mode.</p>
+          <Link className="button button-timber" href="/discover">
+            Find your fit
+          </Link>
         </div>
-        <p>Describe your space, then browse 16 clearly fictional furniture samples while the recommendation model is still in demo mode.</p>
-        <Link className="button button-timber" href="/discover">
-          Find your fit
-        </Link>
       </section>
 
       <div className="page-shell">
