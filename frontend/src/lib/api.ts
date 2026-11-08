@@ -93,11 +93,12 @@ export function toFurnitureProduct(card: ApiProductCard, index: number): Furnitu
 }
 
 /** Calls POST /api/v1/searches and maps the response into FurnitureProduct cards, best match first. */
-export async function searchFurniture(styleDescription: string): Promise<FurnitureProduct[]> {
+export async function searchFurniture(styleDescription: string, maxPrice?: number): Promise<FurnitureProduct[]> {
+  const filters = maxPrice !== undefined ? { max_price: maxPrice } : {};
   const response = await fetch(SEARCH_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filters: {}, style_description: styleDescription }),
+    body: JSON.stringify({ filters, style_description: styleDescription }),
   });
 
   if (!response.ok) {
