@@ -4,6 +4,16 @@ BuyByFit is a room-first furniture discovery experience. A visitor describes the
 
 The repository contains the production-oriented web application, its recommendation and room-visualization service, catalogue tooling, and fine-tuning research for the interior-design expert. It is designed to run usefully with no credentials, while supporting a real Supabase catalogue and separately deployed FastAPI services when configured.
 
+## Product walkthrough
+
+<p align="center">
+  <a href="https://vimeo.com/1244825339">
+    <img src="docs/assets/buybyfit-product-walkthrough.jpg" alt="Watch the BuyByFit product walkthrough on Vimeo" width="860">
+  </a>
+  <br>
+  <strong>▶ Click to play the 59-second BuyByFit walkthrough</strong>
+</p>
+
 ## What is implemented
 
 | Capability | Current implementation |
